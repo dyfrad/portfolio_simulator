@@ -11,6 +11,7 @@ New Features Added:
 - More Visuals: Line chart for historical cumulative returns of the portfolio and assets.
 - Backtesting: Simulate historical portfolio performance over a selected period.
 - Deployment Instructions: See below for deploying to Streamlit Community Cloud.
+- DCA Simulation and Backtesting: Support for monthly/quarterly contributions in simulations and backtests.
 
 To run locally: `streamlit run this_file.py`
 
@@ -75,13 +76,15 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
     return annual_return, annual_vol, sharpe
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly'):
     """
-    Perform bootstrap Monte Carlo simulation with optional inflation adjustment.
+    Perform bootstrap Monte Carlo simulation with optional inflation adjustment and DCA.
     """
     days = int(252 * time_horizon_years)
+    contrib_days = 21 if contrib_frequency == 'monthly' else 63  # Approx trading days per month/quarter
     sim_final_values = []
     sim_port_returns = []
+    sim_final_values_lump = []  # For lump-sum comparison
     
     if len(returns) == 0:
         raise ValueError("No historical returns data available.")
@@ -90,30 +93,49 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
         for _ in range(num_simulations):
             boot_sample = returns.sample(days, replace=True)
             boot_port_returns = np.dot(boot_sample, weights)
+            
+            # Lump-sum
             compounded_return = np.prod(1 + boot_port_returns) - 1
-            # Adjust for inflation
-            adjusted_return = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
-            final_value = initial_investment * (1 + adjusted_return)
-            sim_final_values.append(final_value)
-            sim_port_returns.append(adjusted_return)
+            adjusted_return_lump = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
+            final_value_lump = initial_investment * (1 + adjusted_return_lump)
+            sim_final_values_lump.append(final_value_lump)
+            
+            # DCA
+            value = initial_investment
+            total_invested = initial_investment
+            for d in range(0, days, contrib_days):
+                period_returns = boot_port_returns[d:d+contrib_days]
+                value *= np.prod(1 + period_returns)
+                if d + contrib_days < days:  # Add contrib at period end
+                    value += monthly_contrib
+                    total_invested += monthly_contrib
+            compounded_return_dca = (value / total_invested) - 1 if total_invested > 0 else 0
+            adjusted_return_dca = (1 + compounded_return_dca) / (1 + inflation_rate)**time_horizon_years - 1
+            final_value_dca = total_invested * (1 + adjusted_return_dca)  # Approximate
+            sim_final_values.append(final_value_dca)
+            sim_port_returns.append(adjusted_return_dca)
     
     sim_final_values = np.array(sim_final_values)
     sim_port_returns = np.array(sim_port_returns)
+    sim_final_values_lump = np.array(sim_final_values_lump)
     
     mean_final = np.mean(sim_final_values)
     median_final = np.median(sim_final_values)
     std_final = np.std(sim_final_values)
-    var_95 = np.percentile(sim_port_returns, 5) * initial_investment
-    cvar_95 = np.mean(sim_port_returns[sim_port_returns <= np.percentile(sim_port_returns, 5)]) * initial_investment
+    var_95 = np.percentile(sim_port_returns, 5) * (initial_investment + monthly_contrib * (days // contrib_days))
+    cvar_95 = np.mean(sim_port_returns[sim_port_returns <= np.percentile(sim_port_returns, 5)]) * (initial_investment + monthly_contrib * (days // contrib_days))
+    
+    mean_final_lump = np.mean(sim_final_values_lump)
     
     hist_return, hist_vol, hist_sharpe = portfolio_stats(weights, returns)
     
     results = {
-        'Mean Final Value (Inflation-Adjusted)': mean_final,
-        'Median Final Value (Inflation-Adjusted)': median_final,
-        'Std Dev of Final Values': std_final,
-        '95% VaR (Absolute Loss)': var_95,
-        '95% CVaR (Absolute Loss)': cvar_95,
+        'Mean Final Value (Inflation-Adjusted, DCA)': mean_final,
+        'Median Final Value (Inflation-Adjusted, DCA)': median_final,
+        'Mean Final Value (Lump-Sum Comparison)': mean_final_lump,
+        'Std Dev of Final Values (DCA)': std_final,
+        '95% VaR (Absolute Loss, DCA)': var_95,
+        '95% CVaR (Absolute Loss, DCA)': cvar_95,
         'Historical Annual Return': hist_return,
         'Historical Annual Volatility': hist_vol,
         'Historical Sharpe Ratio': hist_sharpe
@@ -127,11 +149,11 @@ def plot_results(sim_final_values, time_horizon_years, results):
     """
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.hist(sim_final_values, bins=50, alpha=0.75, color='blue')
-    ax.set_title(f'Distribution of Simulated Portfolio Values after {time_horizon_years} Years (Inflation-Adjusted)')
+    ax.set_title(f'Distribution of Simulated Portfolio Values after {time_horizon_years} Years (Inflation-Adjusted, DCA)')
     ax.set_xlabel('Final Portfolio Value')
     ax.set_ylabel('Frequency')
-    ax.axvline(results['Mean Final Value (Inflation-Adjusted)'], color='red', linestyle='--', label='Mean')
-    ax.axvline(results['Median Final Value (Inflation-Adjusted)'], color='green', linestyle='--', label='Median')
+    ax.axvline(results['Mean Final Value (Inflation-Adjusted, DCA)'], color='red', linestyle='--', label='Mean (DCA)')
+    ax.axvline(results['Median Final Value (Inflation-Adjusted, DCA)'], color='green', linestyle='--', label='Median (DCA)')
     ax.legend()
     return fig
 
@@ -150,16 +172,32 @@ def plot_historical_performance(data, weights, tickers):
     fig.update_layout(title='Historical Cumulative Returns', xaxis_title='Date', yaxis_title='Cumulative Return')
     return fig
 
-def backtest_portfolio(data, weights):
+def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly'):
     """
-    Backtest portfolio over historical data.
+    Backtest portfolio over historical data with optional DCA.
     """
     returns = calculate_returns(data)
     port_returns = np.dot(returns, weights)
     cum_port_returns = (1 + port_returns).cumprod()[-1] - 1
     ann_return, ann_vol, sharpe = portfolio_stats(weights, returns)
+    
+    # DCA backtest
+    if monthly_contrib > 0:
+        monthly_data = data.resample('M').last()  # Month-end prices
+        monthly_returns = monthly_data.pct_change().dropna()
+        port_monthly_returns = np.dot(monthly_returns, weights)
+        value = 0.0  # Start with 0 for pure DCA
+        total_invested = 0.0
+        for ret in port_monthly_returns:
+            value = (value + monthly_contrib) * (1 + ret)
+            total_invested += monthly_contrib
+        cum_port_returns_dca = (value / total_invested) - 1 if total_invested > 0 else 0
+    else:
+        cum_port_returns_dca = cum_port_returns
+    
     return {
-        'Total Return': cum_port_returns,
+        'Total Return (DCA)': cum_port_returns_dca,
+        'Total Return (Lump-Sum)': cum_port_returns,
         'Annualized Return': ann_return,
         'Annualized Volatility': ann_vol,
         'Sharpe Ratio': sharpe
@@ -215,7 +253,9 @@ if total_weight != 1.0:
 
 horizon = st.sidebar.slider('Time Horizon (Years)', min_value=1, max_value=20, value=5)
 simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=5000, step=100)
-initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=1000.0, value=100000.0, step=1000.0)
+initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0, step=1000.0)  # Allow 0 for pure DCA
+monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
+contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
 inflation_rate = st.sidebar.slider('Expected Annual Inflation Rate (%)', min_value=0.0, max_value=10.0, value=2.0, step=0.1) / 100
 
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
@@ -241,9 +281,9 @@ if st.sidebar.button('Run Simulation'):
         fig_pie = px.pie(values=weights, names=all_tickers, title='Portfolio Allocation')
         st.plotly_chart(fig_pie)
 
-        # Run simulation with inflation
+        # Run simulation with inflation and DCA
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency
         )
         
         # Display simulation results
@@ -253,12 +293,13 @@ if st.sidebar.button('Run Simulation'):
         col1.metric('Historical Annual Volatility', f"{results['Historical Annual Volatility']:.2%}")
         col1.metric('Historical Sharpe Ratio', f"{results['Historical Sharpe Ratio']:.2f}")
         
-        col2.metric('Mean Final Value (Inflation-Adjusted)', f"€{results['Mean Final Value (Inflation-Adjusted)']:.2f}")
-        col2.metric('Median Final Value (Inflation-Adjusted)', f"€{results['Median Final Value (Inflation-Adjusted)']:.2f}")
-        col2.metric('Std Dev of Final Values', f"€{results['Std Dev of Final Values']:.2f}")
+        col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}")
+        col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}")
+        col2.metric('Mean Final Value (Lump-Sum)', f"€{results['Mean Final Value (Lump-Sum Comparison)']:.2f}")
         
-        col3.metric('95% VaR (Absolute Loss)', f"€{results['95% VaR (Absolute Loss)']:.2f}")
-        col3.metric('95% CVaR (Absolute Loss)', f"€{results['95% CVaR (Absolute Loss)']:.2f}")
+        col3.metric('Std Dev of Final Values (DCA)', f"€{results['Std Dev of Final Values (DCA)']:.2f}")
+        col3.metric('95% VaR (Absolute Loss, DCA)', f"€{results['95% VaR (Absolute Loss, DCA)']:.2f}")
+        col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{results['95% CVaR (Absolute Loss, DCA)']:.2f}")
         
         # Plot simulation distribution
         st.header('Distribution of Outcomes')
@@ -270,13 +311,14 @@ if st.sidebar.button('Run Simulation'):
         fig_hist = plot_historical_performance(data, weights, all_tickers)
         st.plotly_chart(fig_hist)
 
-        # Backtesting
+        # Backtesting with DCA
         st.header('Backtesting Results')
         backtest_end = backtest_end_date if backtest_end_date else None
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
-        backtest_results = backtest_portfolio(backtest_data, weights)
+        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency)
         col1, col2 = st.columns(2)
-        col1.metric('Total Historical Return', f"{backtest_results['Total Return']:.2%}")
+        col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}")
+        col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}")
         col1.metric('Annualized Return', f"{backtest_results['Annualized Return']:.2%}")
         col2.metric('Annualized Volatility', f"{backtest_results['Annualized Volatility']:.2%}")
         col2.metric('Sharpe Ratio', f"{backtest_results['Sharpe Ratio']:.2f}")
