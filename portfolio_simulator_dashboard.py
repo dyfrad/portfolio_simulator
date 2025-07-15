@@ -12,6 +12,7 @@ New Features Added:
 - Backtesting: Simulate historical portfolio performance over a selected period.
 - Deployment Instructions: See below for deploying to Streamlit Community Cloud.
 - DCA Simulation and Backtesting: Support for monthly/quarterly contributions in simulations and backtests.
+- Fees and Taxes: Incorporate TER, transaction fees, and capital gains tax for more realistic projections.
 
 To run locally: `streamlit run this_file.py`
 
@@ -59,11 +60,14 @@ def fetch_data(tickers, start_date, end_date=None):
         st.warning("Limited historical data available. Simulations may not be reliable.")
     return data
 
-def calculate_returns(data):
+def calculate_returns(data, ter=0.0):
     """
-    Calculate daily returns from price data.
+    Calculate daily returns from price data, adjusted for TER.
     """
-    return data.pct_change().dropna()
+    returns = data.pct_change().dropna()
+    daily_ter = (ter / 100) / 252  # Annual TER to daily deduction
+    returns -= daily_ter
+    return returns
 
 def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     """
@@ -76,9 +80,9 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
     return annual_return, annual_vol, sharpe
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly'):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0):
     """
-    Perform bootstrap Monte Carlo simulation with optional inflation adjustment and DCA.
+    Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, and taxes.
     """
     days = int(252 * time_horizon_years)
     contrib_days = 21 if contrib_frequency == 'monthly' else 63  # Approx trading days per month/quarter
@@ -94,26 +98,35 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
             boot_sample = returns.sample(days, replace=True)
             boot_port_returns = np.dot(boot_sample, weights)
             
-            # Lump-sum
+            # Lump-sum (no fees/tax for simplicity in lump-sum, but could add if needed)
             compounded_return = np.prod(1 + boot_port_returns) - 1
             adjusted_return_lump = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
             final_value_lump = initial_investment * (1 + adjusted_return_lump)
-            sim_final_values_lump.append(final_value_lump)
+            # Apply tax on gains for lump-sum
+            gains_lump = final_value_lump - initial_investment
+            net_final_lump = initial_investment + gains_lump * (1 - tax_rate) if gains_lump > 0 else final_value_lump
+            sim_final_values_lump.append(net_final_lump)
             
             # DCA
             value = initial_investment
             total_invested = initial_investment
+            num_contribs = 0
             for d in range(0, days, contrib_days):
                 period_returns = boot_port_returns[d:d+contrib_days]
                 value *= np.prod(1 + period_returns)
-                if d + contrib_days < days:  # Add contrib at period end
-                    value += monthly_contrib
-                    total_invested += monthly_contrib
+                if d + contrib_days < days:  # Add contrib at period end, subtract fee
+                    effective_contrib = monthly_contrib - transaction_fee
+                    value += effective_contrib
+                    total_invested += monthly_contrib  # Total invested before fee deduction
+                    num_contribs += 1
             compounded_return_dca = (value / total_invested) - 1 if total_invested > 0 else 0
             adjusted_return_dca = (1 + compounded_return_dca) / (1 + inflation_rate)**time_horizon_years - 1
-            final_value_dca = total_invested * (1 + adjusted_return_dca)  # Approximate
-            sim_final_values.append(final_value_dca)
-            sim_port_returns.append(adjusted_return_dca)
+            final_value_dca = total_invested * (1 + adjusted_return_dca)
+            # Apply tax on gains for DCA
+            gains_dca = final_value_dca - total_invested
+            net_final_dca = total_invested + gains_dca * (1 - tax_rate) if gains_dca > 0 else final_value_dca
+            sim_final_values.append(net_final_dca)
+            sim_port_returns.append(adjusted_return_dca)  # Use pre-tax for risk metrics
     
     sim_final_values = np.array(sim_final_values)
     sim_port_returns = np.array(sim_port_returns)
@@ -129,6 +142,10 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
     
     hist_return, hist_vol, hist_sharpe = portfolio_stats(weights, returns)
     
+    # Calculate effective cost drag (using mean final DCA gross vs net)
+    gross_mean_final = total_invested * (1 + np.mean([np.prod(1 + np.dot(returns.sample(days, replace=True), weights)) - 1 for _ in range(10)]))  # Approximate gross
+    cost_drag = ((gross_mean_final - mean_final) / gross_mean_final * 100) if gross_mean_final > 0 else 0
+    
     results = {
         'Mean Final Value (Inflation-Adjusted, DCA)': mean_final,
         'Median Final Value (Inflation-Adjusted, DCA)': median_final,
@@ -138,7 +155,8 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
         '95% CVaR (Absolute Loss, DCA)': cvar_95,
         'Historical Annual Return': hist_return,
         'Historical Annual Volatility': hist_vol,
-        'Historical Sharpe Ratio': hist_sharpe
+        'Historical Sharpe Ratio': hist_sharpe,
+        'Effective Cost Drag (%)': cost_drag
     }
     
     return results, sim_final_values
@@ -172,32 +190,41 @@ def plot_historical_performance(data, weights, tickers):
     fig.update_layout(title='Historical Cumulative Returns', xaxis_title='Date', yaxis_title='Cumulative Return')
     return fig
 
-def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly'):
+def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0):
     """
-    Backtest portfolio over historical data with optional DCA.
+    Backtest portfolio over historical data with optional DCA, fees, and taxes.
     """
     returns = calculate_returns(data)
     port_returns = np.dot(returns, weights)
     cum_port_returns = (1 + port_returns).cumprod()[-1] - 1
     ann_return, ann_vol, sharpe = portfolio_stats(weights, returns)
     
+    # Lump-sum with tax
+    gains_lump = initial_investment * cum_port_returns
+    net_cum_port_returns = cum_port_returns - (gains_lump / initial_investment) * tax_rate if gains_lump > 0 else cum_port_returns
+    
     # DCA backtest
+    cum_port_returns_dca = net_cum_port_returns  # Default to lump if no DCA
     if monthly_contrib > 0:
-        monthly_data = data.resample('M').last()  # Month-end prices
+        freq = 'M' if contrib_frequency == 'monthly' else 'Q'
+        monthly_data = data.resample(freq).last()
         monthly_returns = monthly_data.pct_change().dropna()
         port_monthly_returns = np.dot(monthly_returns, weights)
-        value = 0.0  # Start with 0 for pure DCA
+        value = 0.0
         total_invested = 0.0
         for ret in port_monthly_returns:
-            value = (value + monthly_contrib) * (1 + ret)
+            effective_contrib = monthly_contrib - transaction_fee
+            value = (value + effective_contrib) * (1 + ret)
             total_invested += monthly_contrib
         cum_port_returns_dca = (value / total_invested) - 1 if total_invested > 0 else 0
-    else:
-        cum_port_returns_dca = cum_port_returns
+        # Apply tax on gains for DCA
+        gains_dca = value - total_invested
+        net_value_dca = total_invested + gains_dca * (1 - tax_rate) if gains_dca > 0 else value
+        cum_port_returns_dca = (net_value_dca / total_invested) - 1 if total_invested > 0 else 0
     
     return {
         'Total Return (DCA)': cum_port_returns_dca,
-        'Total Return (Lump-Sum)': cum_port_returns,
+        'Total Return (Lump-Sum)': net_cum_port_returns,
         'Annualized Return': ann_return,
         'Annualized Volatility': ann_vol,
         'Sharpe Ratio': sharpe
@@ -258,6 +285,11 @@ monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_valu
 contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
 inflation_rate = st.sidebar.slider('Expected Annual Inflation Rate (%)', min_value=0.0, max_value=10.0, value=2.0, step=0.1) / 100
 
+# New inputs for fees and taxes
+ter = st.sidebar.slider('Annual TER (%)', min_value=0.0, max_value=1.0, value=0.2, step=0.05)
+transaction_fee = st.sidebar.number_input('Transaction Fee per Buy (€)', min_value=0.0, value=5.0, step=1.0)
+tax_rate = st.sidebar.slider('Capital Gains Tax Rate (%)', min_value=0.0, max_value=50.0, value=25.0, step=1.0) / 100
+
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
 backtest_end_date = st.sidebar.text_input('Backtest End Date (YYYY-MM-DD, optional)', '')
 
@@ -266,7 +298,7 @@ if st.sidebar.button('Run Simulation'):
     try:
         # Fetch data
         data = fetch_data(all_tickers, start_date)
-        returns = calculate_returns(data)
+        returns = calculate_returns(data, ter)  # Adjust for TER
 
         # Apply optimization if checked
         if optimize:
@@ -281,9 +313,9 @@ if st.sidebar.button('Run Simulation'):
         fig_pie = px.pie(values=weights, names=all_tickers, title='Portfolio Allocation')
         st.plotly_chart(fig_pie)
 
-        # Run simulation with inflation and DCA
+        # Run simulation with inflation, DCA, fees, tax
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate
         )
         
         # Display simulation results
@@ -300,6 +332,7 @@ if st.sidebar.button('Run Simulation'):
         col3.metric('Std Dev of Final Values (DCA)', f"€{results['Std Dev of Final Values (DCA)']:.2f}")
         col3.metric('95% VaR (Absolute Loss, DCA)', f"€{results['95% VaR (Absolute Loss, DCA)']:.2f}")
         col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{results['95% CVaR (Absolute Loss, DCA)']:.2f}")
+        col3.metric('Effective Cost Drag (%)', f"{results['Effective Cost Drag (%)']:.2f}%")
         
         # Plot simulation distribution
         st.header('Distribution of Outcomes')
@@ -311,11 +344,11 @@ if st.sidebar.button('Run Simulation'):
         fig_hist = plot_historical_performance(data, weights, all_tickers)
         st.plotly_chart(fig_hist)
 
-        # Backtesting with DCA
+        # Backtesting with DCA, fees, tax
         st.header('Backtesting Results')
         backtest_end = backtest_end_date if backtest_end_date else None
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
-        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency)
+        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency, transaction_fee, tax_rate)
         col1, col2 = st.columns(2)
         col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}")
         col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}")
