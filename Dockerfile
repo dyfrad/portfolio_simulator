@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
-COPY portfolio_simulator_dashboard.py .
+COPY portfolio_simulator.py .
 
 # Expose the default Streamlit port
 EXPOSE 8501
