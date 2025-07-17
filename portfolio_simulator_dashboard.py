@@ -14,6 +14,9 @@ New Features Added:
 - DCA Simulation and Backtesting: Support for monthly/quarterly contributions in simulations and backtests.
 - Fees and Taxes: Incorporate TER, transaction fees, and capital gains tax for more realistic projections.
 - Automatic Rebalancing: Option to simulate rebalancing at specified frequency and threshold, with drift visualization.
+- Advanced Risk Metrics: Added Sortino ratio and max drawdown to historical and backtest stats.
+- Stress Scenarios: Dropdown for predefined stress tests (e.g., 2008 Recession) with return shocks in simulations.
+- Drawdown Visualization: Plot of historical portfolio drawdown curves.
 
 To run locally: `streamlit run this_file.py`
 
@@ -72,18 +75,32 @@ def calculate_returns(data, ter=0.0):
 
 def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     """
-    Calculate historical portfolio statistics.
+    Calculate historical portfolio statistics, including Sortino and max drawdown.
     """
     port_returns = np.dot(returns, weights)
-    annual_return = np.mean(port_returns) * 252
+    mean_return = np.mean(port_returns)
+    annual_return = mean_return * 252
     annual_vol = np.std(port_returns) * np.sqrt(252)
     rf_rate = returns[cash_ticker].mean() * 252 if cash_ticker in returns.columns else 0
     sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
-    return annual_return, annual_vol, sharpe
+    
+    # Sortino Ratio
+    downside_returns = port_returns.copy()
+    downside_returns[port_returns > 0] = 0
+    downside_std = np.std(downside_returns) * np.sqrt(252)
+    sortino = (annual_return - rf_rate) / downside_std if downside_std > 0 else 0
+    
+    # Max Drawdown
+    cum_returns = np.cumprod(1 + port_returns)
+    peaks = np.maximum.accumulate(cum_returns)
+    drawdowns = (cum_returns / peaks) - 1
+    max_dd = drawdowns.min()
+    
+    return annual_return, annual_vol, sharpe, sortino, max_dd
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None):
     """
-    Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, and rebalancing.
+    Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, rebalancing, and stress shocks.
     """
     days = int(252 * time_horizon_years)
     contrib_days = 21 if contrib_frequency == 'monthly' else 63  # Approx trading days per month/quarter
@@ -97,7 +114,14 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
     
     progress_bar = st.progress(0)
     for i in range(num_simulations):
-        boot_sample = returns.sample(days, replace=True)
+        boot_sample = returns.sample(days, replace=True).reset_index(drop=True)
+        
+        # Apply stress shock if specified
+        if shock_factors is not None:
+            shock_start = np.random.randint(0, days - 251)
+            daily_shock = shock_factors / 252
+            for dd in range(252):
+                boot_sample.iloc[shock_start + dd] = daily_shock
         
         # Lump-sum
         boot_port_returns = np.dot(boot_sample, weights)
@@ -148,7 +172,7 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
     
     mean_final_lump = np.mean(sim_final_values_lump)
     
-    hist_return, hist_vol, hist_sharpe = portfolio_stats(weights, returns)
+    hist_return, hist_vol, hist_sharpe, hist_sortino, hist_max_dd = portfolio_stats(weights, returns)
     
     # Calculate effective cost drag (using mean final DCA gross vs net)
     gross_mean_final = total_invested * (1 + np.mean([np.prod(1 + np.dot(returns.sample(days, replace=True), weights)) - 1 for _ in range(10)]))  # Approximate gross
@@ -164,6 +188,8 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
         'Historical Annual Return': hist_return,
         'Historical Annual Volatility': hist_vol,
         'Historical Sharpe Ratio': hist_sharpe,
+        'Historical Sortino Ratio': hist_sortino,
+        'Historical Max Drawdown': hist_max_dd,
         'Effective Cost Drag (%)': cost_drag
     }
     
@@ -229,6 +255,20 @@ def plot_weight_drift(returns, target_weights, rebalance=False, rebalance_freque
     fig.update_layout(title='Portfolio Weight Drift Over Time', xaxis_title='Date', yaxis_title='Weight')
     return fig
 
+def plot_drawdowns(returns, weights):
+    """
+    Plot historical drawdown curve for the portfolio.
+    """
+    port_returns = np.dot(returns, weights)
+    cum_returns = np.cumprod(1 + port_returns)
+    peaks = np.maximum.accumulate(cum_returns)
+    drawdowns = (cum_returns / peaks) - 1
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=returns.index, y=drawdowns, mode='lines', name='Drawdown', fill='tozeroy'))
+    fig.update_layout(title='Historical Portfolio Drawdown', xaxis_title='Date', yaxis_title='Drawdown')
+    return fig
+
 def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
     """
     Backtest portfolio over historical data with optional DCA, fees, taxes, and rebalancing.
@@ -252,7 +292,7 @@ def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='mo
         day_count += 1
     
     cum_port_returns = (total_value / initial_investment) - 1 if initial_investment > 0 else 0
-    ann_return, ann_vol, sharpe = portfolio_stats(weights, returns)
+    ann_return, ann_vol, sharpe, sortino, max_dd = portfolio_stats(weights, returns)
     
     # Lump-sum with tax
     gains_lump = initial_investment * cum_port_returns
@@ -282,12 +322,14 @@ def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='mo
         'Total Return (Lump-Sum)': net_cum_port_returns,
         'Annualized Return': ann_return,
         'Annualized Volatility': ann_vol,
-        'Sharpe Ratio': sharpe
+        'Sharpe Ratio': sharpe,
+        'Sortino Ratio': sortino,
+        'Max Drawdown': max_dd
     }
 
 def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
     def objective(weights):
-        ann_ret, ann_vol, sharpe = portfolio_stats(weights, returns, cash_ticker)
+        ann_ret, ann_vol, sharpe, _, _ = portfolio_stats(weights, returns, cash_ticker)
         return -sharpe  # Minimize negative Sharpe
     
     constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
@@ -350,6 +392,9 @@ rebalance = st.sidebar.checkbox('Enable Rebalancing')
 rebalance_frequency = st.sidebar.selectbox('Rebalancing Frequency', ['annual', 'quarterly'])
 rebalance_threshold = st.sidebar.slider('Rebalancing Threshold (%)', min_value=0.0, max_value=20.0, value=5.0, step=0.5) / 100
 
+# New input for stress scenarios
+stress_scenario = st.sidebar.selectbox('Stress Scenario', ['None', '2008 Recession', 'COVID Crash', '2022 Bear Market', 'Inflation Spike'])
+
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
 backtest_end_date = st.sidebar.text_input('Backtest End Date (YYYY-MM-DD, optional)', '')
 
@@ -369,13 +414,32 @@ if st.sidebar.button('Run Simulation'):
             else:
                 raise ValueError("Weight optimization failed. Using default equal weights.")
 
+        # Handle stress scenario
+        shock_factors = None
+        if stress_scenario != 'None':
+            scenarios = {
+                '2008 Recession': [-0.40, -0.55, 0.05, 0.02],
+                'COVID Crash': [-0.34, -0.35, 0.15, 0.00],
+                '2022 Bear Market': [-0.18, -0.08, 0.00, 0.00],
+                'Inflation Spike': [0.05, 0.05, 0.30, 0.05],
+            }
+            shock_factors = scenarios[stress_scenario]
+            if len(all_tickers) > len(shock_factors):
+                avg_stock_shock = np.mean(shock_factors[:2])
+                shock_factors += [avg_stock_shock] * (len(all_tickers) - len(shock_factors))
+            shock_factors = np.array(shock_factors)
+            if stress_scenario == 'Inflation Spike':
+                inflation_rate = 0.08
+                st.info('Inflation rate overridden to 8% for Inflation Spike scenario.')
+            st.info(f'Simulating under {stress_scenario} stress conditions.')
+
         # Display allocation pie chart
         fig_pie = px.pie(values=weights, names=all_tickers, title='Portfolio Allocation')
         st.plotly_chart(fig_pie)
 
-        # Run simulation with inflation, DCA, fees, tax, rebalancing
+        # Run simulation with inflation, DCA, fees, tax, rebalancing, stress
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors
         )
         
         # Display simulation results
@@ -384,6 +448,8 @@ if st.sidebar.button('Run Simulation'):
         col1.metric('Historical Annual Return', f"{results['Historical Annual Return']:.2%}")
         col1.metric('Historical Annual Volatility', f"{results['Historical Annual Volatility']:.2%}")
         col1.metric('Historical Sharpe Ratio', f"{results['Historical Sharpe Ratio']:.2f}")
+        col1.metric('Historical Sortino Ratio', f"{results['Historical Sortino Ratio']:.2f}")
+        col1.metric('Historical Max Drawdown', f"{results['Historical Max Drawdown']:.2%}")
         
         col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}")
         col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}")
@@ -404,6 +470,11 @@ if st.sidebar.button('Run Simulation'):
         fig_hist = plot_historical_performance(data, weights, all_tickers)
         st.plotly_chart(fig_hist)
 
+        # Historical drawdown plot
+        st.header('Historical Drawdown')
+        fig_dd = plot_drawdowns(returns, weights)
+        st.plotly_chart(fig_dd)
+
         # Weight drift plot
         st.header('Weight Drift Analysis')
         fig_drift = plot_weight_drift(returns, weights, rebalance, rebalance_frequency, rebalance_threshold)
@@ -420,6 +491,8 @@ if st.sidebar.button('Run Simulation'):
         col1.metric('Annualized Return', f"{backtest_results['Annualized Return']:.2%}")
         col2.metric('Annualized Volatility', f"{backtest_results['Annualized Volatility']:.2%}")
         col2.metric('Sharpe Ratio', f"{backtest_results['Sharpe Ratio']:.2f}")
+        col2.metric('Sortino Ratio', f"{backtest_results['Sortino Ratio']:.2f}")
+        col2.metric('Max Drawdown', f"{backtest_results['Max Drawdown']:.2%}")
 
     except ValueError as e:
         st.error(str(e))
