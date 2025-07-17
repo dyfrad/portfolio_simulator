@@ -13,6 +13,7 @@ New Features Added:
 - Deployment Instructions: See below for deploying to Streamlit Community Cloud.
 - DCA Simulation and Backtesting: Support for monthly/quarterly contributions in simulations and backtests.
 - Fees and Taxes: Incorporate TER, transaction fees, and capital gains tax for more realistic projections.
+- Automatic Rebalancing: Option to simulate rebalancing at specified frequency and threshold, with drift visualization.
 
 To run locally: `streamlit run this_file.py`
 
@@ -80,12 +81,13 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
     return annual_return, annual_vol, sharpe
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
     """
-    Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, and taxes.
+    Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, and rebalancing.
     """
     days = int(252 * time_horizon_years)
     contrib_days = 21 if contrib_frequency == 'monthly' else 63  # Approx trading days per month/quarter
+    rebalance_days = 252 if rebalance_frequency == 'annual' else 63  # Annual or quarterly
     sim_final_values = []
     sim_port_returns = []
     sim_final_values_lump = []  # For lump-sum comparison
@@ -93,40 +95,46 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
     if len(returns) == 0:
         raise ValueError("No historical returns data available.")
     
-    with st.spinner('Running simulations...'):
-        for _ in range(num_simulations):
-            boot_sample = returns.sample(days, replace=True)
-            boot_port_returns = np.dot(boot_sample, weights)
-            
-            # Lump-sum (no fees/tax for simplicity in lump-sum, but could add if needed)
-            compounded_return = np.prod(1 + boot_port_returns) - 1
-            adjusted_return_lump = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
-            final_value_lump = initial_investment * (1 + adjusted_return_lump)
-            # Apply tax on gains for lump-sum
-            gains_lump = final_value_lump - initial_investment
-            net_final_lump = initial_investment + gains_lump * (1 - tax_rate) if gains_lump > 0 else final_value_lump
-            sim_final_values_lump.append(net_final_lump)
-            
-            # DCA
-            value = initial_investment
-            total_invested = initial_investment
-            num_contribs = 0
-            for d in range(0, days, contrib_days):
-                period_returns = boot_port_returns[d:d+contrib_days]
-                value *= np.prod(1 + period_returns)
-                if d + contrib_days < days:  # Add contrib at period end, subtract fee
-                    effective_contrib = monthly_contrib - transaction_fee
-                    value += effective_contrib
-                    total_invested += monthly_contrib  # Total invested before fee deduction
-                    num_contribs += 1
-            compounded_return_dca = (value / total_invested) - 1 if total_invested > 0 else 0
-            adjusted_return_dca = (1 + compounded_return_dca) / (1 + inflation_rate)**time_horizon_years - 1
-            final_value_dca = total_invested * (1 + adjusted_return_dca)
-            # Apply tax on gains for DCA
-            gains_dca = final_value_dca - total_invested
-            net_final_dca = total_invested + gains_dca * (1 - tax_rate) if gains_dca > 0 else final_value_dca
-            sim_final_values.append(net_final_dca)
-            sim_port_returns.append(adjusted_return_dca)  # Use pre-tax for risk metrics
+    progress_bar = st.progress(0)
+    for i in range(num_simulations):
+        boot_sample = returns.sample(days, replace=True)
+        
+        # Lump-sum
+        boot_port_returns = np.dot(boot_sample, weights)
+        compounded_return = np.prod(1 + boot_port_returns) - 1
+        adjusted_return_lump = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
+        final_value_lump = initial_investment * (1 + adjusted_return_lump)
+        gains_lump = final_value_lump - initial_investment
+        net_final_lump = initial_investment + gains_lump * (1 - tax_rate) if gains_lump > 0 else final_value_lump
+        sim_final_values_lump.append(net_final_lump)
+        
+        # DCA with optional rebalancing
+        values = np.full(len(weights), initial_investment / len(weights)) if initial_investment > 0 else np.zeros(len(weights))
+        total_value = initial_investment
+        total_invested = initial_investment
+        for d in range(0, days, contrib_days):
+            period_returns = boot_sample.iloc[d:d+contrib_days]
+            values *= np.prod(1 + period_returns, axis=0)
+            total_value = np.sum(values)
+            if d + contrib_days < days:
+                effective_contrib = monthly_contrib - transaction_fee
+                contrib_per_asset = effective_contrib * weights
+                values += contrib_per_asset
+                total_invested += monthly_contrib
+            # Rebalance if enabled and at interval
+            if rebalance and (d % rebalance_days == 0 or d + contrib_days >= days):
+                current_weights = values / total_value if total_value > 0 else weights
+                if np.any(np.abs(current_weights - weights) > rebalance_threshold):
+                    values = total_value * weights  # Reset to target weights (virtual sell/buy)
+        final_value_dca = np.sum(values)
+        gains_dca = final_value_dca - total_invested
+        net_final_dca = total_invested + gains_dca * (1 - tax_rate) if gains_dca > 0 else final_value_dca
+        adjusted_net_final_dca = net_final_dca / (1 + inflation_rate)**time_horizon_years
+        sim_final_values.append(adjusted_net_final_dca)
+        sim_port_returns.append((adjusted_net_final_dca / total_invested) - 1 if total_invested > 0 else 0)
+        
+        # Update progress
+        progress_bar.progress((i + 1) / num_simulations)
     
     sim_final_values = np.array(sim_final_values)
     sim_port_returns = np.array(sim_port_returns)
@@ -190,13 +198,60 @@ def plot_historical_performance(data, weights, tickers):
     fig.update_layout(title='Historical Cumulative Returns', xaxis_title='Date', yaxis_title='Cumulative Return')
     return fig
 
-def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0):
+def plot_weight_drift(returns, target_weights, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
     """
-    Backtest portfolio over historical data with optional DCA, fees, and taxes.
+    Plot weight drift over time, with optional rebalancing.
+    """
+    num_assets = len(target_weights)
+    values = np.full(num_assets, 1.0 / num_assets)  # Start with equal value per asset (total 1)
+    drift_data = pd.DataFrame(index=returns.index, columns=['Drift'] + [f'Weight {i}' for i in range(num_assets)])
+    rebalance_days = 252 if rebalance_frequency == 'annual' else 63
+    day_count = 0
+    
+    for date, daily_returns in returns.iterrows():
+        values *= (1 + daily_returns)
+        total_value = np.sum(values)
+        current_weights = values / total_value if total_value > 0 else target_weights
+        max_drift = np.max(np.abs(current_weights - target_weights))
+        drift_data.at[date, 'Drift'] = max_drift
+        for i in range(num_assets):
+            drift_data.at[date, f'Weight {i}'] = current_weights[i]
+        
+        if rebalance and (day_count % rebalance_days == 0):
+            if max_drift > rebalance_threshold:
+                values = total_value * target_weights  # Rebalance
+        day_count += 1
+    
+    fig = go.Figure()
+    for col in drift_data.columns[1:]:
+        fig.add_trace(go.Scatter(x=drift_data.index, y=drift_data[col], mode='lines', name=col))
+    fig.add_trace(go.Scatter(x=drift_data.index, y=drift_data['Drift'], mode='lines', name='Max Drift', line=dict(dash='dot')))
+    fig.update_layout(title='Portfolio Weight Drift Over Time', xaxis_title='Date', yaxis_title='Weight')
+    return fig
+
+def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
+    """
+    Backtest portfolio over historical data with optional DCA, fees, taxes, and rebalancing.
     """
     returns = calculate_returns(data)
-    port_returns = np.dot(returns, weights)
-    cum_port_returns = (1 + port_returns).cumprod()[-1] - 1
+    num_assets = len(weights)
+    values = np.full(num_assets, initial_investment / num_assets) if initial_investment > 0 else np.zeros(num_assets)
+    total_value = initial_investment
+    total_invested = initial_investment
+    rebalance_days = 252 if rebalance_frequency == 'annual' else 63
+    day_count = 0
+    
+    for _, daily_returns in returns.iterrows():
+        values *= (1 + daily_returns)
+        total_value = np.sum(values)
+        current_weights = values / total_value if total_value > 0 else weights
+        if rebalance and (day_count % rebalance_days == 0):
+            max_drift = np.max(np.abs(current_weights - weights))
+            if max_drift > rebalance_threshold:
+                values = total_value * weights  # Rebalance
+        day_count += 1
+    
+    cum_port_returns = (total_value / initial_investment) - 1 if initial_investment > 0 else 0
     ann_return, ann_vol, sharpe = portfolio_stats(weights, returns)
     
     # Lump-sum with tax
@@ -279,7 +334,7 @@ if total_weight != 1.0:
     st.sidebar.warning(f'Weights normalized to sum to 1: {weights.round(2)}')
 
 horizon = st.sidebar.slider('Time Horizon (Years)', min_value=1, max_value=20, value=5)
-simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=5000, step=100)
+simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=1000, step=100)  # Reduced default for speed
 initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0, step=1000.0)  # Allow 0 for pure DCA
 monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
 contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
@@ -289,6 +344,11 @@ inflation_rate = st.sidebar.slider('Expected Annual Inflation Rate (%)', min_val
 ter = st.sidebar.slider('Annual TER (%)', min_value=0.0, max_value=1.0, value=0.2, step=0.05)
 transaction_fee = st.sidebar.number_input('Transaction Fee per Buy (€)', min_value=0.0, value=5.0, step=1.0)
 tax_rate = st.sidebar.slider('Capital Gains Tax Rate (%)', min_value=0.0, max_value=50.0, value=25.0, step=1.0) / 100
+
+# New inputs for rebalancing
+rebalance = st.sidebar.checkbox('Enable Rebalancing')
+rebalance_frequency = st.sidebar.selectbox('Rebalancing Frequency', ['annual', 'quarterly'])
+rebalance_threshold = st.sidebar.slider('Rebalancing Threshold (%)', min_value=0.0, max_value=20.0, value=5.0, step=0.5) / 100
 
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
 backtest_end_date = st.sidebar.text_input('Backtest End Date (YYYY-MM-DD, optional)', '')
@@ -313,9 +373,9 @@ if st.sidebar.button('Run Simulation'):
         fig_pie = px.pie(values=weights, names=all_tickers, title='Portfolio Allocation')
         st.plotly_chart(fig_pie)
 
-        # Run simulation with inflation, DCA, fees, tax
+        # Run simulation with inflation, DCA, fees, tax, rebalancing
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold
         )
         
         # Display simulation results
@@ -344,11 +404,16 @@ if st.sidebar.button('Run Simulation'):
         fig_hist = plot_historical_performance(data, weights, all_tickers)
         st.plotly_chart(fig_hist)
 
-        # Backtesting with DCA, fees, tax
+        # Weight drift plot
+        st.header('Weight Drift Analysis')
+        fig_drift = plot_weight_drift(returns, weights, rebalance, rebalance_frequency, rebalance_threshold)
+        st.plotly_chart(fig_drift)
+
+        # Backtesting with DCA, fees, tax, rebalancing
         st.header('Backtesting Results')
         backtest_end = backtest_end_date if backtest_end_date else None
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
-        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency, transaction_fee, tax_rate)
+        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
         col1, col2 = st.columns(2)
         col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}")
         col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}")
