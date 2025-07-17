@@ -18,10 +18,7 @@ class ResultsDisplay:
     
     def render_all_results(self, session_data: Dict[str, Any]):
         """Render all results sections."""
-        # Display pie charts section
-        self._render_pie_charts(session_data)
-        
-        # Display simulation results
+        # Display simulation results (pie charts already displayed during simulation)
         self._render_simulation_metrics(session_data['results'])
         
         # Plot simulation distribution
@@ -209,21 +206,6 @@ class ResultsDisplay:
                 file_name="portfolio_report.pdf",
                 mime="application/pdf"
             )
-    
-    def _render_pie_charts(self, session_data: Dict[str, Any]):
-        """Render pie charts section."""
-        st.header('Portfolio Allocation')
-        
-        if session_data.get('fig_pie_optimized'):
-            # Show both original and optimized charts side by side
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(session_data['fig_pie_original'], key="pie_chart_original_results", use_container_width=True)
-            with col2:
-                st.plotly_chart(session_data['fig_pie_optimized'], key="pie_chart_optimized_results", use_container_width=True)
-        else:
-            # Show only original chart
-            st.plotly_chart(session_data['fig_pie_original'], key="pie_chart_original_results")
     
     def _render_csv_download_button(self, results: Dict[str, float]):
         """Render CSV download button."""
