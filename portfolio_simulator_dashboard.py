@@ -596,7 +596,7 @@ if uploaded_file is None:
         weights = weights / total_weight
         st.sidebar.warning(f'Weights normalized to sum to 1: {weights.round(2)}')
 
-horizon = st.sidebar.slider('Time Horizon (Years)', min_value=1, max_value=20, value=5)
+horizon = st.sidebar.number_input('Time Horizon (1 - 10 Years):', min_value=1, max_value=10, value=5, step=1)
 simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=1000, step=100)  # Reduced default for speed
 initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0 if uploaded_file is None else initial_investment, step=1000.0, disabled=uploaded_file is not None)  # Allow 0 for pure DCA
 monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
