@@ -10,8 +10,11 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Copy the entire application code
 COPY portfolio_simulator.py .
+COPY portfolio_simulator_ui.py .
+COPY ui/ ./ui/
+COPY reports/ ./reports/
 
 # Expose the default Streamlit port
 EXPOSE 8501
@@ -19,5 +22,5 @@ EXPOSE 8501
 # Health check (optional, but good practice)
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
 
-# Run the Streamlit app
-CMD ["streamlit", "run", "portfolio_simulator.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Run the refactored Streamlit app entry point
+CMD ["streamlit", "run", "portfolio_simulator_ui.py", "--server.port=8501", "--server.address=0.0.0.0"]
