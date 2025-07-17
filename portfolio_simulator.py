@@ -568,7 +568,7 @@ tax_rate = st.sidebar.number_input('Capital Gains Tax Rate (0 - 50 %, in steps o
 
 # New inputs for rebalancing
 rebalance = st.sidebar.checkbox('Enable Rebalancing')
-rebalance_frequency = st.sidebar.selectbox('Rebalancing Frequency', ['annual', 'quarterly'])
+rebalance_frequency = st.sidebar.selectbox('Rebalancing Frequency', ['quarterly', 'annual'])
 rebalance_threshold = st.sidebar.number_input('Rebalancing Threshold (0 - 20 %, in steps of 0.5%)', min_value=0.0, max_value=20.0, value=5.0, step=0.5) / 100
 
 # New input for stress scenarios
