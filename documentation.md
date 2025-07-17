@@ -292,12 +292,44 @@ def plot_backtest_performance(port_value_series, dca_value_series, bench_data=No
 ## Portfolio Optimization
 
 ### Concept
-Maximizes Sharpe via constrained optimization (Markowitz, 1952). Objective: Minimize -Sharpe, subject to \( \sum w = 1 \), \( 0 \leq w \leq 1 \).
+Portfolio optimization, rooted in Modern Portfolio Theory (MPT), aims to construct an optimal portfolio by balancing expected return and risk. The implementation maximizes the Sharpe ratio, a measure of risk-adjusted return, under constraints that prevent short-selling and ensure full allocation. This is a constrained optimization problem, often solved via quadratic programming or sequential methods.
 
-Reference: "Portfolio Selection" by Harry Markowitz.
+MPT assumes investors are rational and risk-averse, seeking to maximize utility (return for given risk). The efficient frontier represents portfolios with the highest return for a given volatility level. The tangency portfolio (maximum Sharpe) lies where the capital market line touches the frontier.
 
-### Code
-Uses `scipy.optimize.minimize` with SLSQP solver implicitly.
+Key assumptions: Returns are normally distributed (often violated in practice due to fat tails), historical data predicts future (stationarity), no transaction costs or taxes in optimization (handled elsewhere in the app).
+
+Mathematical Formulations:
+- Let \( \mathbf{w} \) be the weight vector (\( n \)-assets), \( \boldsymbol{\mu} \) the vector of expected (historical mean) annual returns, \( \boldsymbol{\Sigma} \) the covariance matrix of returns, \( r_f \) the risk-free rate.
+- Portfolio expected return: \( \mu_p = \mathbf{w}^T \boldsymbol{\mu} \).
+- Portfolio variance: \( \sigma_p^2 = \mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w} \).
+- Sharpe Ratio: \( S = \frac{\mu_p - r_f}{\sigma_p} = \frac{\mathbf{w}^T \boldsymbol{\mu} - r_f}{\sqrt{\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}}} \).
+- Optimization Problem: Maximize \( S(\mathbf{w}) \), equivalent to minimizing \( -S(\mathbf{w}) \), subject to:
+  - \( \mathbf{1}^T \mathbf{w} = 1 \) (full allocation),
+  - \( 0 \leq w_i \leq 1 \) for all \( i \) (no short-selling, no leverage beyond 100%).
+- This is a non-convex fractional quadratic program, but can be reformulated as a quadratic program by minimizing variance for target returns or using approximations. In practice, numerical solvers handle it.
+- Covariance Estimation: \( \boldsymbol{\Sigma} = \frac{1}{T-1} (\mathbf{R} - \bar{\mathbf{r}})^T (\mathbf{R} - \bar{\mathbf{r}}) \), where \( \mathbf{R} \) is the \( T \times n \) returns matrix, \( \bar{\mathbf{r}} \) mean row vector.
+- Sensitivity: Small changes in \( \boldsymbol{\mu} \) or \( \boldsymbol{\Sigma} \) can lead to extreme weights (estimation error amplification). Regularization (e.g., shrinkage) can mitigate but is not implemented here.
+
+The solution yields weights on or near the efficient frontier, assuming historical means and covariances.
+
+References: "Portfolio Selection" by Harry Markowitz (1952); "Mean-Variance Analysis in Portfolio Choice and Capital Markets" by Markowitz (1987); Michaud (1989) on optimization instability; "Robust Portfolio Optimization and Management" by Fabozzi et al. for advanced techniques.
+
+### Code Implementation
+```python
+def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
+    def objective(weights):
+        ann_ret, ann_vol, sharpe, _, _ = portfolio_stats(weights, returns, cash_ticker)
+        return -sharpe  # Minimize negative Sharpe
+    
+    constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
+    bounds = [(0, 1) for _ in range(len(returns.columns))]
+    initial_guess = np.array([1/len(returns.columns)] * len(returns.columns))
+    result = minimize(objective, initial_guess, bounds=bounds, constraints=constraints)
+    return result.x if result.success else None
+```
+- **Logic**: Defines objective as negative Sharpe using `portfolio_stats` (which computes \( \mu_p, \sigma_p \) from historical data). Uses SciPy's `minimize` with SLSQP (Sequential Least Squares Programming) solver for non-linear constraints. Starts with equal weights. Returns optimized weights if converged.
+- **Edge Cases**: Failure (e.g., singular matrix, insufficient data) returns None, falling back to equal weights. Zero volatility assets may cause division errors (handled in stats). High correlations can lead to corner solutions (e.g., all-in-one asset).
+- **Scrutiny Points**: Historical means are upward-biased estimators; consider Bayesian priors or Black-Litterman for better inputs. No diversification constraints (e.g., max weight limit). For quadratic form, could use CVXPY for explicit mean-variance QP.
 
 ## PDF Report Generation
 
