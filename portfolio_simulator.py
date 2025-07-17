@@ -14,9 +14,7 @@ import io
 from scipy.optimize import minimize
 import plotly.express as px
 import plotly.graph_objects as go
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
+from reports import PDFReportGenerator, ReportFactory
 
 # Default tickers for the assets (UCITS-compliant, EUR-traded)
 DEFAULT_TICKERS = ['IWDA.AS', 'QDV5.DE', 'PPFB.DE', 'XEON.DE']  # MSCI World, MSCI India, Gold, Cash
@@ -330,76 +328,6 @@ def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
     result = minimize(objective, initial_guess, bounds=bounds, constraints=constraints)
     return result.x if result.success else None
 
-def generate_pdf_report(all_tickers, weights, results, backtest_results, fig_pie, fig_hist, fig_dd, fig_drift, fig_dist, horizon):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    y = height - 50
-
-    c.drawString(100, y, "Portfolio Simulator Report")
-    y -= 30
-
-    c.drawString(100, y, "Portfolio Allocation:")
-    y -= 20
-    pie_img = io.BytesIO()
-    fig_pie.write_image(pie_img, format='png')
-    pie_img.seek(0)
-    c.drawImage(ImageReader(pie_img), 100, y - 200, width=400, height=200)
-    y -= 220
-
-    c.drawString(100, y, "Simulation Results:")
-    y -= 20
-    for key, value in results.items():
-        c.drawString(120, y, f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
-        y -= 15
-    y -= 20
-
-    c.drawString(100, y, "Backtesting Results:")
-    y -= 20
-    for key, value in backtest_results.items():
-        c.drawString(120, y, f"{key}: {value:.2%}" if 'Return' in key or 'Volatility' in key or 'Drawdown' in key else f"{key}: {value:.2f}")
-        y -= 15
-
-    c.showPage()
-    y = height - 50
-
-    c.drawString(100, y, "Charts:")
-    y -= 20
-
-    # Historical Performance
-    hist_img = io.BytesIO()
-    fig_hist.write_image(hist_img, format='png')
-    hist_img.seek(0)
-    c.drawImage(ImageReader(hist_img), 100, y - 200, width=400, height=200)
-    y -= 220
-
-    # Drawdown
-    dd_img = io.BytesIO()
-    fig_dd.write_image(dd_img, format='png')
-    dd_img.seek(0)
-    c.drawImage(ImageReader(dd_img), 100, y - 200, width=400, height=200)
-    y -= 220
-
-    c.showPage()
-    y = height - 50
-
-    # Weight Drift
-    drift_img = io.BytesIO()
-    fig_drift.write_image(drift_img, format='png')
-    drift_img.seek(0)
-    c.drawImage(ImageReader(drift_img), 100, y - 200, width=400, height=200)
-    y -= 220
-
-    # Distribution
-    dist_img = io.BytesIO()
-    fig_dist.savefig(dist_img, format='png')
-    dist_img.seek(0)
-    c.drawImage(ImageReader(dist_img), 100, y - 200, width=400, height=200)
-
-    c.save()
-    buffer.seek(0)
-    return buffer
-
 # Explanations for tooltips
 explanations = {
     'Historical Annual Return': "The average annual return based on historical data.",
@@ -703,18 +631,29 @@ if st.session_state.ran_simulation:
 
     # Generate PDF Report Button
     if st.button('Generate PDF Report'):
-        pdf_buffer = generate_pdf_report(
-            st.session_state.all_tickers, 
-            st.session_state.weights, 
-            st.session_state.results, 
-            st.session_state.backtest_results, 
-            st.session_state.fig_pie, 
-            st.session_state.fig_hist, 
-            st.session_state.fig_dd, 
-            st.session_state.fig_drift, 
-            st.session_state.fig_dist, 
-            st.session_state.horizon
+        # Create charts dictionary
+        charts = ReportFactory.create_charts_dict(
+            fig_pie=st.session_state.fig_pie,
+            fig_hist=st.session_state.fig_hist,
+            fig_dd=st.session_state.fig_dd,
+            fig_drift=st.session_state.fig_drift,
+            fig_dist=st.session_state.fig_dist
         )
+        
+        # Create report data
+        report_data = ReportFactory.create_simulation_report(
+            tickers=st.session_state.all_tickers,
+            weights=st.session_state.weights,
+            simulation_results=st.session_state.results,
+            backtest_results=st.session_state.backtest_results,
+            charts=charts,
+            horizon_years=st.session_state.horizon
+        )
+        
+        # Generate PDF
+        pdf_generator = PDFReportGenerator()
+        pdf_buffer = pdf_generator.generate(report_data)
+        
         st.download_button(
             label="Download PDF Report",
             data=pdf_buffer,
