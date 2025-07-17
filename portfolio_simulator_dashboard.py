@@ -19,6 +19,8 @@ New Features Added:
 - Drawdown Visualization: Plot of historical portfolio drawdown curves.
 - Portfolio Upload: Upload CSV with holdings (Ticker, Shares, Cost Basis); fetch real-time prices to derive current value, weights, and use as simulation base.
 - Transaction CSV Support: Upload transaction history CSV to compute current holdings, cost basis, and map ISIN to tickers.
+- Educational Tooltips: Added help tooltips to metrics for explanations.
+- Report Generation: Button to generate and download a PDF report with metrics and charts.
 
 To run locally: `streamlit run this_file.py`
 
@@ -35,9 +37,11 @@ For Deployment to Streamlit Community Cloud (as of July 2025):
    matplotlib
    scipy
    plotly
+   reportlab
+   kaleido
 6. Deploy—it's free for public apps. For secrets (if any), use the app's settings.
 
-Dependencies: yfinance, numpy, pandas, matplotlib, streamlit, scipy, plotly
+Dependencies: yfinance, numpy, pandas, matplotlib, streamlit, scipy, plotly, reportlab, kaleido
 """
 
 import yfinance as yf
@@ -49,6 +53,9 @@ import io
 from scipy.optimize import minimize
 import plotly.express as px
 import plotly.graph_objects as go
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
 # Default tickers for the assets (UCITS-compliant, EUR-traded)
 DEFAULT_TICKERS = ['IWDA.AS', 'QDV5.DE', 'PPFB.DE', 'XEON.DE']  # MSCI World, MSCI India, Gold, Cash
@@ -358,6 +365,99 @@ def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
     result = minimize(objective, initial_guess, bounds=bounds, constraints=constraints)
     return result.x if result.success else None
 
+def generate_pdf_report(all_tickers, weights, results, backtest_results, fig_pie, fig_hist, fig_dd, fig_drift, fig_dist, horizon):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 50
+
+    c.drawString(100, y, "Portfolio Simulator Report")
+    y -= 30
+
+    c.drawString(100, y, "Portfolio Allocation:")
+    y -= 20
+    pie_img = io.BytesIO()
+    fig_pie.write_image(pie_img, format='png')
+    pie_img.seek(0)
+    c.drawImage(ImageReader(pie_img), 100, y - 200, width=400, height=200)
+    y -= 220
+
+    c.drawString(100, y, "Simulation Results:")
+    y -= 20
+    for key, value in results.items():
+        c.drawString(120, y, f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+        y -= 15
+    y -= 20
+
+    c.drawString(100, y, "Backtesting Results:")
+    y -= 20
+    for key, value in backtest_results.items():
+        c.drawString(120, y, f"{key}: {value:.2%}" if 'Return' in key or 'Volatility' in key or 'Drawdown' in key else f"{key}: {value:.2f}")
+        y -= 15
+
+    c.showPage()
+    y = height - 50
+
+    c.drawString(100, y, "Charts:")
+    y -= 20
+
+    # Historical Performance
+    hist_img = io.BytesIO()
+    fig_hist.write_image(hist_img, format='png')
+    hist_img.seek(0)
+    c.drawImage(ImageReader(hist_img), 100, y - 200, width=400, height=200)
+    y -= 220
+
+    # Drawdown
+    dd_img = io.BytesIO()
+    fig_dd.write_image(dd_img, format='png')
+    dd_img.seek(0)
+    c.drawImage(ImageReader(dd_img), 100, y - 200, width=400, height=200)
+    y -= 220
+
+    c.showPage()
+    y = height - 50
+
+    # Weight Drift
+    drift_img = io.BytesIO()
+    fig_drift.write_image(drift_img, format='png')
+    drift_img.seek(0)
+    c.drawImage(ImageReader(drift_img), 100, y - 200, width=400, height=200)
+    y -= 220
+
+    # Distribution
+    dist_img = io.BytesIO()
+    fig_dist.savefig(dist_img, format='png')
+    dist_img.seek(0)
+    c.drawImage(ImageReader(dist_img), 100, y - 200, width=400, height=200)
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+# Explanations for tooltips
+explanations = {
+    'Historical Annual Return': "The average annual return based on historical data.",
+    'Historical Annual Volatility': "The standard deviation of annual returns, measuring risk.",
+    'Historical Sharpe Ratio': "Risk-adjusted return: (return - risk-free rate) / volatility.",
+    'Historical Sortino Ratio': "Similar to Sharpe but only considers downside volatility.",
+    'Historical Max Drawdown': "The largest peak-to-trough decline in portfolio value.",
+    'Mean Final Value (Inflation-Adjusted, DCA)': "Average ending value after simulations, adjusted for inflation, using Dollar-Cost Averaging.",
+    'Median Final Value (Inflation-Adjusted, DCA)': "Median ending value after simulations, adjusted for inflation, using DCA.",
+    'Mean Final Value (Lump-Sum)': "Average ending value if invested all at once, for comparison.",
+    'Std Dev of Final Values (DCA)': "Variability in the simulated ending values.",
+    '95% VaR (Absolute Loss, DCA)': "There is a 5% chance of losing more than this amount over the horizon.",
+    '95% CVaR (Absolute Loss, DCA)': "The average loss in the worst 5% of scenarios.",
+    'Effective Cost Drag (%)': "The percentage reduction in returns due to fees and taxes.",
+    'Total Historical Return (DCA)': "Total return from backtest using Dollar-Cost Averaging.",
+    'Total Historical Return (Lump-Sum)': "Total return from backtest if invested all at once.",
+    'Annualized Return': "Average annual return from historical backtest.",
+    'Annualized Volatility': "Annualized standard deviation of returns from backtest.",
+    'Sharpe Ratio': "Risk-adjusted return from backtest.",
+    'Sortino Ratio': "Downside risk-adjusted return from backtest.",
+    'Max Drawdown': "Largest decline in backtest."
+}
+
 # Streamlit Dashboard
 st.title('Portfolio Simulator Dashboard')
 
@@ -555,25 +655,25 @@ if st.sidebar.button('Run Simulation'):
         # Display simulation results
         st.header('Simulation Results')
         col1, col2, col3 = st.columns(3)
-        col1.metric('Historical Annual Return', f"{results['Historical Annual Return']:.2%}")
-        col1.metric('Historical Annual Volatility', f"{results['Historical Annual Volatility']:.2%}")
-        col1.metric('Historical Sharpe Ratio', f"{results['Historical Sharpe Ratio']:.2f}")
-        col1.metric('Historical Sortino Ratio', f"{results['Historical Sortino Ratio']:.2f}")
-        col1.metric('Historical Max Drawdown', f"{results['Historical Max Drawdown']:.2%}")
+        col1.metric('Historical Annual Return', f"{results['Historical Annual Return']:.2%}", help=explanations['Historical Annual Return'])
+        col1.metric('Historical Annual Volatility', f"{results['Historical Annual Volatility']:.2%}", help=explanations['Historical Annual Volatility'])
+        col1.metric('Historical Sharpe Ratio', f"{results['Historical Sharpe Ratio']:.2f}", help=explanations['Historical Sharpe Ratio'])
+        col1.metric('Historical Sortino Ratio', f"{results['Historical Sortino Ratio']:.2f}", help=explanations['Historical Sortino Ratio'])
+        col1.metric('Historical Max Drawdown', f"{results['Historical Max Drawdown']:.2%}", help=explanations['Historical Max Drawdown'])
         
-        col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}")
-        col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}")
-        col2.metric('Mean Final Value (Lump-Sum)', f"€{results['Mean Final Value (Lump-Sum Comparison)']:.2f}")
+        col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Mean Final Value (Inflation-Adjusted, DCA)'])
+        col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Median Final Value (Inflation-Adjusted, DCA)'])
+        col2.metric('Mean Final Value (Lump-Sum)', f"€{results['Mean Final Value (Lump-Sum Comparison)']:.2f}", help=explanations['Mean Final Value (Lump-Sum)'])
         
-        col3.metric('Std Dev of Final Values (DCA)', f"€{results['Std Dev of Final Values (DCA)']:.2f}")
-        col3.metric('95% VaR (Absolute Loss, DCA)', f"€{results['95% VaR (Absolute Loss, DCA)']:.2f}")
-        col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{results['95% CVaR (Absolute Loss, DCA)']:.2f}")
-        col3.metric('Effective Cost Drag (%)', f"{results['Effective Cost Drag (%)']:.2f}%")
+        col3.metric('Std Dev of Final Values (DCA)', f"€{results['Std Dev of Final Values (DCA)']:.2f}", help=explanations['Std Dev of Final Values (DCA)'])
+        col3.metric('95% VaR (Absolute Loss, DCA)', f"€{results['95% VaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% VaR (Absolute Loss, DCA)'])
+        col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{results['95% CVaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% CVaR (Absolute Loss, DCA)'])
+        col3.metric('Effective Cost Drag (%)', f"{results['Effective Cost Drag (%)']:.2f}%", help=explanations['Effective Cost Drag (%)'])
         
         # Plot simulation distribution
         st.header('Distribution of Outcomes')
-        fig = plot_results(sim_final_values, horizon, results)
-        st.pyplot(fig)
+        fig_dist = plot_results(sim_final_values, horizon, results)
+        st.pyplot(fig_dist)
 
         # Historical performance plot
         st.header('Historical Performance')
@@ -596,13 +696,23 @@ if st.sidebar.button('Run Simulation'):
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
         backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
         col1, col2 = st.columns(2)
-        col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}")
-        col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}")
-        col1.metric('Annualized Return', f"{backtest_results['Annualized Return']:.2%}")
-        col2.metric('Annualized Volatility', f"{backtest_results['Annualized Volatility']:.2%}")
-        col2.metric('Sharpe Ratio', f"{backtest_results['Sharpe Ratio']:.2f}")
-        col2.metric('Sortino Ratio', f"{backtest_results['Sortino Ratio']:.2f}")
-        col2.metric('Max Drawdown', f"{backtest_results['Max Drawdown']:.2%}")
+        col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}", help=explanations['Total Historical Return (DCA)'])
+        col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}", help=explanations['Total Historical Return (Lump-Sum)'])
+        col1.metric('Annualized Return', f"{backtest_results['Annualized Return']:.2%}", help=explanations['Annualized Return'])
+        col2.metric('Annualized Volatility', f"{backtest_results['Annualized Volatility']:.2%}", help=explanations['Annualized Volatility'])
+        col2.metric('Sharpe Ratio', f"{backtest_results['Sharpe Ratio']:.2f}", help=explanations['Sharpe Ratio'])
+        col2.metric('Sortino Ratio', f"{backtest_results['Sortino Ratio']:.2f}", help=explanations['Sortino Ratio'])
+        col2.metric('Max Drawdown', f"{backtest_results['Max Drawdown']:.2%}", help=explanations['Max Drawdown'])
+
+        # Generate PDF Report Button
+        if st.button('Generate PDF Report'):
+            pdf_buffer = generate_pdf_report(all_tickers, weights, results, backtest_results, fig_pie, fig_hist, fig_dd, fig_drift, fig_dist, horizon)
+            st.download_button(
+                label="Download PDF Report",
+                data=pdf_buffer,
+                file_name="portfolio_report.pdf",
+                mime="application/pdf"
+            )
 
     except ValueError as e:
         st.error(str(e))
