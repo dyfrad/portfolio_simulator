@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios. It allows interactive adjustments to portfolio weights, simulation parameters, and visualizations of results. The application supports features like inflation adjustment, Dollar-Cost Averaging (DCA), custom assets, backtesting, fees/taxes, rebalancing, stress scenarios, and report generation.
+This is a personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios. It allows interactive adjustments to portfolio weights, simulation parameters, and visualizations of results. The application supports features like inflation adjustment, Dollar-Cost Averaging (DCA), custom assets, backtesting, fees/taxes, rebalancing, stress scenarios, and report generation. Key use cases include setting custom tickers for flexibility and uploading CSV files tuned for Degiro transaction history to automatically compute current holdings, cost basis, and portfolio weights.
 
 Originally cloned from the private repository at `github.com/dyfrad/portfolio_simulator` for personal use. This project is not intended for open-source distribution or public sharing. All modifications and usage are for private financial planning purposes only.
 
@@ -18,7 +18,7 @@ Originally cloned from the private repository at `github.com/dyfrad/portfolio_si
 - **Rebalancing**: Automatic rebalancing at specified frequency and threshold, with drift visualization.
 - **Advanced Metrics**: Sharpe ratio, Sortino ratio, max drawdown, VaR, CVaR.
 - **Stress Scenarios**: Predefined tests like 2008 Recession or COVID Crash.
-- **Portfolio Upload**: Upload CSV for holdings (Ticker, Shares, Cost Basis) or transaction history to compute current value and weights.
+- **Portfolio Upload**: Upload CSV for holdings (Ticker, Shares, Cost Basis) or transaction history (tuned for Degiro transactions) to compute current value and weights.
 - **Educational Tooltips**: Help explanations for metrics.
 - **Report Generation**: Download PDF reports with metrics and charts.
 
@@ -88,7 +88,7 @@ This setup ensures all dependencies are contained and the app runs consistently 
 
 1. **Sidebar Inputs**:
    - Adjust weights, time horizon, simulations, initial investment, contributions, inflation, fees/taxes, rebalancing, and stress scenarios.
-   - Upload a CSV for portfolio holdings or transactions to auto-populate weights and values.
+   - Upload a CSV for portfolio holdings or transactions (tuned for Degiro transactions) to auto-populate weights and values.
    - Optional: Optimize weights for maximum Sharpe ratio.
 
 2. **Run Simulation**:
