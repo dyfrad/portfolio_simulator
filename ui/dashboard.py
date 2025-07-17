@@ -52,6 +52,10 @@ class PortfolioDashboard:
         """Render dashboard header and description."""
         st.title('Portfolio Simulator')
         
+        # Author information in main section
+        st.markdown("**Author: Mohit Saharan (mohit@msaharan.com)**")
+        st.markdown("---")
+        
         st.markdown("""
         This dashboard simulates the performance of a portfolio consisting of default assets:
         - MSCI World (IWDA.AS)

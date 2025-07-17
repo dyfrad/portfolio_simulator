@@ -55,10 +55,9 @@ class SidebarInputs:
         
     def render(self) -> SimulationConfig:
         """Render all sidebar inputs and return configuration."""
+        # Simulation Parameters header
         st.sidebar.header('Simulation Parameters')
-        
-        # Author information
-        self._render_author_info()
+        st.sidebar.markdown("---")
         
         # Portfolio configuration
         portfolio_config = self._render_portfolio_config()
@@ -90,13 +89,6 @@ class SidebarInputs:
             **stress_params,
             **data_params
         )
-    
-    def _render_author_info(self):
-        """Render author information section."""
-        st.sidebar.markdown("**Author Information**")
-        st.sidebar.markdown("**Mohit Saharan**")
-        st.sidebar.markdown("mohit@msaharan.com")
-        st.sidebar.markdown("---")
     
     def _render_portfolio_config(self) -> dict:
         """Render portfolio configuration inputs."""
