@@ -478,6 +478,12 @@ Add custom tickers below for more flexibility.
 """)
 
 # Sidebar for inputs
+# Author information
+st.sidebar.markdown("**Author Information**")
+st.sidebar.markdown("**Mohit Saharan**")
+st.sidebar.markdown("mohit@msaharan.com")
+st.sidebar.markdown("---")
+
 st.sidebar.header('Simulation Parameters')
 
 optimize = st.sidebar.checkbox('Optimize Weights for Max Sharpe')
@@ -612,12 +618,6 @@ stress_scenario = st.sidebar.selectbox('Stress Scenario', ['None', '2008 Recessi
 
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
 backtest_end_date = st.sidebar.text_input('Backtest End Date (YYYY-MM-DD, optional)', '')
-
-# Author information
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Author Information**")
-st.sidebar.markdown("**Mohit Saharan**")
-st.sidebar.markdown("mohit@msaharan.com")
 
 # Run button
 if st.sidebar.button('Run Simulation'):
