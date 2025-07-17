@@ -51,11 +51,16 @@ class PDFReportGenerator:
         c.drawString(self.margin, y, "Portfolio Allocation:")
         y -= 20
         
-        # Add pie chart
-        if 'pie' in report_data.charts:
-            pie_img = self._chart_to_image(report_data.charts['pie'])
-            if pie_img:
-                c.drawImage(pie_img, self.margin, y - 200, width=400, height=200)
+        # Add pie charts
+        if 'pie_original' in report_data.charts:
+            pie_original_img = self._chart_to_image(report_data.charts['pie_original'])
+            if pie_original_img:
+                c.drawImage(pie_original_img, self.margin, y - 200, width=300, height=200)
+        
+        if 'pie_optimized' in report_data.charts:
+            pie_optimized_img = self._chart_to_image(report_data.charts['pie_optimized'])
+            if pie_optimized_img:
+                c.drawImage(pie_optimized_img, self.margin + 320, y - 200, width=300, height=200)
     
     def _add_results_sections(self, c: canvas.Canvas, report_data: ReportData) -> None:
         """Add simulation and backtest results."""

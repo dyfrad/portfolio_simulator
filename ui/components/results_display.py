@@ -18,7 +18,10 @@ class ResultsDisplay:
     
     def render_all_results(self, session_data: Dict[str, Any]):
         """Render all results sections."""
-        # Display simulation results (pie chart already displayed during simulation)
+        # Display pie charts section
+        self._render_pie_charts(session_data)
+        
+        # Display simulation results
         self._render_simulation_metrics(session_data['results'])
         
         # Plot simulation distribution
@@ -178,7 +181,8 @@ class ResultsDisplay:
         if st.button('Generate PDF Report'):
             # Create charts dictionary
             charts = ReportFactory.create_charts_dict(
-                fig_pie=session_data['fig_pie'],
+                fig_pie_original=session_data['fig_pie_original'],
+                fig_pie_optimized=session_data.get('fig_pie_optimized'),
                 fig_hist=session_data['fig_hist'],
                 fig_dd=session_data['fig_dd'],
                 fig_drift=session_data['fig_drift'],
@@ -205,6 +209,21 @@ class ResultsDisplay:
                 file_name="portfolio_report.pdf",
                 mime="application/pdf"
             )
+    
+    def _render_pie_charts(self, session_data: Dict[str, Any]):
+        """Render pie charts section."""
+        st.header('Portfolio Allocation')
+        
+        if session_data.get('fig_pie_optimized'):
+            # Show both original and optimized charts side by side
+            col1, col2 = st.columns(2)
+            with col1:
+                st.plotly_chart(session_data['fig_pie_original'], key="pie_chart_original_results", use_container_width=True)
+            with col2:
+                st.plotly_chart(session_data['fig_pie_optimized'], key="pie_chart_optimized_results", use_container_width=True)
+        else:
+            # Show only original chart
+            st.plotly_chart(session_data['fig_pie_original'], key="pie_chart_original_results")
     
     def _render_csv_download_button(self, results: Dict[str, float]):
         """Render CSV download button."""

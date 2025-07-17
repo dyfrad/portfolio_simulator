@@ -97,12 +97,26 @@ class PortfolioDashboard:
             if config.stress_scenario != 'None':
                 st.info(f'Simulating under {config.stress_scenario} stress conditions.')
             
-            # Create pie chart immediately and store for later display
-            fig_pie = px.pie(values=weights, names=config.all_tickers, title='Portfolio Allocation')
+            # Create pie charts for original and optimized weights
+            fig_pie_original = px.pie(values=config.weights, names=config.all_tickers, title='Original Portfolio Allocation')
             
-            # Store pie chart in session state for immediate display
-            st.session_state.fig_pie = fig_pie
-            st.plotly_chart(fig_pie, key="pie_chart_immediate")
+            if config.optimize_weights:
+                fig_pie_optimized = px.pie(values=weights, names=config.all_tickers, title='Optimized Portfolio Allocation')
+                
+                # Display both charts side by side
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.plotly_chart(fig_pie_original, key="pie_chart_original", use_container_width=True)
+                with col2:
+                    st.plotly_chart(fig_pie_optimized, key="pie_chart_optimized", use_container_width=True)
+                
+                # Store both charts for later use
+                st.session_state.fig_pie_original = fig_pie_original
+                st.session_state.fig_pie_optimized = fig_pie_optimized
+            else:
+                # Display only original chart if no optimization
+                st.plotly_chart(fig_pie_original, key="pie_chart_original")
+                st.session_state.fig_pie_original = fig_pie_original
             
             # Show progress indicator
             progress_bar = st.progress(0)
@@ -149,7 +163,8 @@ class PortfolioDashboard:
                 weights=weights,
                 horizon=config.horizon,
                 backtest_results=backtest_results,
-                fig_pie=fig_pie,
+                fig_pie_original=st.session_state.fig_pie_original,
+                fig_pie_optimized=st.session_state.get('fig_pie_optimized'),
                 fig_dist=fig_dist,
                 fig_hist=fig_hist,
                 fig_dd=fig_dd,

@@ -22,7 +22,8 @@ class ReportFactory:
     ) -> ReportData:
         """Create a simulation report data object from individual components."""
         chart_mapping = {
-            'pie': charts.get('fig_pie'),
+            'pie_original': charts.get('fig_pie_original'),
+            'pie_optimized': charts.get('fig_pie_optimized'),
             'hist': charts.get('fig_hist'), 
             'dd': charts.get('fig_dd'),
             'drift': charts.get('fig_drift'),
@@ -43,7 +44,8 @@ class ReportFactory:
     
     @staticmethod
     def create_charts_dict(
-        fig_pie=None, 
+        fig_pie_original=None,
+        fig_pie_optimized=None,
         fig_hist=None, 
         fig_dd=None, 
         fig_drift=None, 
@@ -51,7 +53,8 @@ class ReportFactory:
     ) -> Dict[str, Any]:
         """Helper method to create charts dictionary from individual chart objects."""
         return {
-            'fig_pie': fig_pie,
+            'fig_pie_original': fig_pie_original,
+            'fig_pie_optimized': fig_pie_optimized,
             'fig_hist': fig_hist,
             'fig_dd': fig_dd,
             'fig_drift': fig_drift,

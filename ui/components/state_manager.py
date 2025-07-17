@@ -24,11 +24,12 @@ class StateManager:
         weights: np.ndarray,
         horizon: float,
         backtest_results: Dict[str, float],
-        fig_pie: Any,
-        fig_dist: Any,
-        fig_hist: Any,
-        fig_dd: Any,
-        fig_drift: Any
+        fig_pie_original: Any,
+        fig_pie_optimized: Any = None,
+        fig_dist: Any = None,
+        fig_hist: Any = None,
+        fig_dd: Any = None,
+        fig_drift: Any = None
     ):
         """Store all simulation results in session state."""
         st.session_state.results = results
@@ -37,7 +38,8 @@ class StateManager:
         st.session_state.weights = weights
         st.session_state.horizon = horizon
         st.session_state.backtest_results = backtest_results
-        st.session_state.fig_pie = fig_pie
+        st.session_state.fig_pie_original = fig_pie_original
+        st.session_state.fig_pie_optimized = fig_pie_optimized
         st.session_state.fig_dist = fig_dist
         st.session_state.fig_hist = fig_hist
         st.session_state.fig_dd = fig_dd
@@ -62,7 +64,8 @@ class StateManager:
             'weights': st.session_state.weights,
             'horizon': st.session_state.horizon,
             'backtest_results': st.session_state.backtest_results,
-            'fig_pie': st.session_state.fig_pie,
+            'fig_pie_original': st.session_state.fig_pie_original,
+            'fig_pie_optimized': st.session_state.fig_pie_optimized,
             'fig_dist': st.session_state.fig_dist,
             'fig_hist': st.session_state.fig_hist,
             'fig_dd': st.session_state.fig_dd,
@@ -74,7 +77,7 @@ class StateManager:
         """Clear simulation results from session state."""
         st.session_state.ran_simulation = False
         for key in ['results', 'sim_final_values', 'all_tickers', 'weights', 
-                   'horizon', 'backtest_results', 'fig_pie', 'fig_dist', 
-                   'fig_hist', 'fig_dd', 'fig_drift']:
+                   'horizon', 'backtest_results', 'fig_pie_original', 'fig_pie_optimized', 
+                   'fig_dist', 'fig_hist', 'fig_dd', 'fig_drift']:
             if key in st.session_state:
                 del st.session_state[key] 
