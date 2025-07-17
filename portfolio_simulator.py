@@ -81,7 +81,7 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     
     return annual_return, annual_vol, sharpe, sortino, max_dd
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, periodic_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, periodic_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None, progress_callback=None):
     """
     Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, rebalancing, and stress shocks.
     """
@@ -98,6 +98,10 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
         raise ValueError("No historical returns data available.")
     
     for i in range(num_simulations):
+        # Update progress if callback provided
+        if progress_callback:
+            progress_callback((i + 1) / num_simulations)
+            
         boot_sample = returns.sample(days, replace=True).reset_index(drop=True)
         
         # Apply stress shock if specified

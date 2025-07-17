@@ -97,8 +97,19 @@ class PortfolioDashboard:
             if config.stress_scenario != 'None':
                 st.info(f'Simulating under {config.stress_scenario} stress conditions.')
             
-            # Create charts
+            # Create and display pie chart immediately
             fig_pie = px.pie(values=weights, names=config.all_tickers, title='Portfolio Allocation')
+            st.plotly_chart(fig_pie)
+            
+            # Show progress indicator
+            progress_bar = st.progress(0)
+            st.text("Running Monte Carlo simulation...")
+            
+            # Progress callback function
+            def update_progress(progress):
+                progress_bar.progress(progress)
+                if progress >= 1.0:
+                    st.text("Simulation complete! Generating charts...")
             
             # Run simulation
             results, sim_final_values = bootstrap_simulation(
@@ -106,7 +117,7 @@ class PortfolioDashboard:
                 config.initial_investment, inflation_rate, config.periodic_contrib, 
                 config.contrib_frequency, config.transaction_fee, config.tax_rate, 
                 config.rebalance, config.rebalance_frequency, config.rebalance_threshold, 
-                shock_factors, config.base_invested
+                shock_factors, config.base_invested, progress_callback=update_progress
             )
             
             # Create visualization charts
