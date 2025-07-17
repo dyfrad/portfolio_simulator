@@ -79,6 +79,10 @@ ISIN_TO_TICKER = {
 # Default start date for historical data
 DEFAULT_START_DATE = '2015-01-01'
 
+# Initialize session state
+if 'ran_simulation' not in st.session_state:
+    st.session_state.ran_simulation = False
+
 @st.cache_data
 def fetch_data(tickers, start_date, end_date=None):
     """
@@ -296,7 +300,7 @@ def plot_drawdowns(returns, weights):
     fig.update_layout(title='Historical Portfolio Drawdown', xaxis_title='Date', yaxis_title='Drawdown')
     return fig
 
-def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
+def backtest_portfolio(data, weights, initial_investment, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
     """
     Backtest portfolio over historical data with optional DCA, fees, taxes, and rebalancing.
     """
@@ -645,82 +649,116 @@ if st.sidebar.button('Run Simulation'):
 
         # Display allocation pie chart
         fig_pie = px.pie(values=weights, names=all_tickers, title='Portfolio Allocation')
-        st.plotly_chart(fig_pie)
 
         # Run simulation with inflation, DCA, fees, tax, rebalancing, stress
         results, sim_final_values = bootstrap_simulation(
             returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors, base_invested
         )
         
-        # Display simulation results
-        st.header('Simulation Results')
-        col1, col2, col3 = st.columns(3)
-        col1.metric('Historical Annual Return', f"{results['Historical Annual Return']:.2%}", help=explanations['Historical Annual Return'])
-        col1.metric('Historical Annual Volatility', f"{results['Historical Annual Volatility']:.2%}", help=explanations['Historical Annual Volatility'])
-        col1.metric('Historical Sharpe Ratio', f"{results['Historical Sharpe Ratio']:.2f}", help=explanations['Historical Sharpe Ratio'])
-        col1.metric('Historical Sortino Ratio', f"{results['Historical Sortino Ratio']:.2f}", help=explanations['Historical Sortino Ratio'])
-        col1.metric('Historical Max Drawdown', f"{results['Historical Max Drawdown']:.2%}", help=explanations['Historical Max Drawdown'])
-        
-        col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Mean Final Value (Inflation-Adjusted, DCA)'])
-        col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Median Final Value (Inflation-Adjusted, DCA)'])
-        col2.metric('Mean Final Value (Lump-Sum)', f"€{results['Mean Final Value (Lump-Sum Comparison)']:.2f}", help=explanations['Mean Final Value (Lump-Sum)'])
-        
-        col3.metric('Std Dev of Final Values (DCA)', f"€{results['Std Dev of Final Values (DCA)']:.2f}", help=explanations['Std Dev of Final Values (DCA)'])
-        col3.metric('95% VaR (Absolute Loss, DCA)', f"€{results['95% VaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% VaR (Absolute Loss, DCA)'])
-        col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{results['95% CVaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% CVaR (Absolute Loss, DCA)'])
-        col3.metric('Effective Cost Drag (%)', f"{results['Effective Cost Drag (%)']:.2f}%", help=explanations['Effective Cost Drag (%)'])
-        
-        # Plot simulation distribution
-        st.header('Distribution of Outcomes')
         fig_dist = plot_results(sim_final_values, horizon, results)
-        st.pyplot(fig_dist)
 
-        # Historical performance plot
-        st.header('Historical Performance')
         fig_hist = plot_historical_performance(data, weights, all_tickers)
-        st.plotly_chart(fig_hist)
 
-        # Historical drawdown plot
-        st.header('Historical Drawdown')
         fig_dd = plot_drawdowns(returns, weights)
-        st.plotly_chart(fig_dd)
 
-        # Weight drift plot
-        st.header('Weight Drift Analysis')
         fig_drift = plot_weight_drift(returns, weights, rebalance, rebalance_frequency, rebalance_threshold)
-        st.plotly_chart(fig_drift)
 
         # Backtesting with DCA, fees, tax, rebalancing
-        st.header('Backtesting Results')
         backtest_end = backtest_end_date if backtest_end_date else None
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
-        backtest_results = backtest_portfolio(backtest_data, weights, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
-        col1, col2 = st.columns(2)
-        col1.metric('Total Historical Return (DCA)', f"{backtest_results['Total Return (DCA)']:.2%}", help=explanations['Total Historical Return (DCA)'])
-        col1.metric('Total Historical Return (Lump-Sum)', f"{backtest_results['Total Return (Lump-Sum)']:.2%}", help=explanations['Total Historical Return (Lump-Sum)'])
-        col1.metric('Annualized Return', f"{backtest_results['Annualized Return']:.2%}", help=explanations['Annualized Return'])
-        col2.metric('Annualized Volatility', f"{backtest_results['Annualized Volatility']:.2%}", help=explanations['Annualized Volatility'])
-        col2.metric('Sharpe Ratio', f"{backtest_results['Sharpe Ratio']:.2f}", help=explanations['Sharpe Ratio'])
-        col2.metric('Sortino Ratio', f"{backtest_results['Sortino Ratio']:.2f}", help=explanations['Sortino Ratio'])
-        col2.metric('Max Drawdown', f"{backtest_results['Max Drawdown']:.2%}", help=explanations['Max Drawdown'])
+        backtest_results = backtest_portfolio(backtest_data, weights, initial_investment, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
 
-        # Generate PDF Report Button
-        if st.button('Generate PDF Report'):
-            pdf_buffer = generate_pdf_report(all_tickers, weights, results, backtest_results, fig_pie, fig_hist, fig_dd, fig_drift, fig_dist, horizon)
-            st.download_button(
-                label="Download PDF Report",
-                data=pdf_buffer,
-                file_name="portfolio_report.pdf",
-                mime="application/pdf"
-            )
+        # Store in session state
+        st.session_state.results = results
+        st.session_state.sim_final_values = sim_final_values
+        st.session_state.fig_pie = fig_pie
+        st.session_state.fig_dist = fig_dist
+        st.session_state.fig_hist = fig_hist
+        st.session_state.fig_dd = fig_dd
+        st.session_state.fig_drift = fig_drift
+        st.session_state.backtest_results = backtest_results
+        st.session_state.all_tickers = all_tickers
+        st.session_state.weights = weights
+        st.session_state.horizon = horizon
+        st.session_state.ran_simulation = True
 
     except ValueError as e:
         st.error(str(e))
 
-# CSV Download (shows after successful run)
-if 'results' in locals():
+if st.session_state.ran_simulation:
+    # Display allocation pie chart
+    st.plotly_chart(st.session_state.fig_pie)
+
+    # Display simulation results
+    st.header('Simulation Results')
+    col1, col2, col3 = st.columns(3)
+    col1.metric('Historical Annual Return', f"{st.session_state.results['Historical Annual Return']:.2%}", help=explanations['Historical Annual Return'])
+    col1.metric('Historical Annual Volatility', f"{st.session_state.results['Historical Annual Volatility']:.2%}", help=explanations['Historical Annual Volatility'])
+    col1.metric('Historical Sharpe Ratio', f"{st.session_state.results['Historical Sharpe Ratio']:.2f}", help=explanations['Historical Sharpe Ratio'])
+    col1.metric('Historical Sortino Ratio', f"{st.session_state.results['Historical Sortino Ratio']:.2f}", help=explanations['Historical Sortino Ratio'])
+    col1.metric('Historical Max Drawdown', f"{st.session_state.results['Historical Max Drawdown']:.2%}", help=explanations['Historical Max Drawdown'])
+    
+    col2.metric('Mean Final Value (Inflation-Adjusted, DCA)', f"€{st.session_state.results['Mean Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Mean Final Value (Inflation-Adjusted, DCA)'])
+    col2.metric('Median Final Value (Inflation-Adjusted, DCA)', f"€{st.session_state.results['Median Final Value (Inflation-Adjusted, DCA)']:.2f}", help=explanations['Median Final Value (Inflation-Adjusted, DCA)'])
+    col2.metric('Mean Final Value (Lump-Sum)', f"€{st.session_state.results['Mean Final Value (Lump-Sum Comparison)']:.2f}", help=explanations['Mean Final Value (Lump-Sum)'])
+    
+    col3.metric('Std Dev of Final Values (DCA)', f"€{st.session_state.results['Std Dev of Final Values (DCA)']:.2f}", help=explanations['Std Dev of Final Values (DCA)'])
+    col3.metric('95% VaR (Absolute Loss, DCA)', f"€{st.session_state.results['95% VaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% VaR (Absolute Loss, DCA)'])
+    col3.metric('95% CVaR (Absolute Loss, DCA)', f"€{st.session_state.results['95% CVaR (Absolute Loss, DCA)']:.2f}", help=explanations['95% CVaR (Absolute Loss, DCA)'])
+    col3.metric('Effective Cost Drag (%)', f"{st.session_state.results['Effective Cost Drag (%)']:.2f}%", help=explanations['Effective Cost Drag (%)'])
+    
+    # Plot simulation distribution
+    st.header('Distribution of Outcomes')
+    st.pyplot(st.session_state.fig_dist)
+
+    # Historical performance plot
+    st.header('Historical Performance')
+    st.plotly_chart(st.session_state.fig_hist)
+
+    # Historical drawdown plot
+    st.header('Historical Drawdown')
+    st.plotly_chart(st.session_state.fig_dd)
+
+    # Weight drift plot
+    st.header('Weight Drift Analysis')
+    st.plotly_chart(st.session_state.fig_drift)
+
+    # Backtesting results
+    st.header('Backtesting Results')
+    col1, col2 = st.columns(2)
+    col1.metric('Total Historical Return (DCA)', f"{st.session_state.backtest_results['Total Return (DCA)']:.2%}", help=explanations['Total Historical Return (DCA)'])
+    col1.metric('Total Historical Return (Lump-Sum)', f"{st.session_state.backtest_results['Total Return (Lump-Sum)']:.2%}", help=explanations['Total Historical Return (Lump-Sum)'])
+    col1.metric('Annualized Return', f"{st.session_state.backtest_results['Annualized Return']:.2%}", help=explanations['Annualized Return'])
+    col2.metric('Annualized Volatility', f"{st.session_state.backtest_results['Annualized Volatility']:.2%}", help=explanations['Annualized Volatility'])
+    col2.metric('Sharpe Ratio', f"{st.session_state.backtest_results['Sharpe Ratio']:.2f}", help=explanations['Sharpe Ratio'])
+    col2.metric('Sortino Ratio', f"{st.session_state.backtest_results['Sortino Ratio']:.2f}", help=explanations['Sortino Ratio'])
+    col2.metric('Max Drawdown', f"{st.session_state.backtest_results['Max Drawdown']:.2%}", help=explanations['Max Drawdown'])
+
+    # Generate PDF Report Button
+    if st.button('Generate PDF Report'):
+        pdf_buffer = generate_pdf_report(
+            st.session_state.all_tickers, 
+            st.session_state.weights, 
+            st.session_state.results, 
+            st.session_state.backtest_results, 
+            st.session_state.fig_pie, 
+            st.session_state.fig_hist, 
+            st.session_state.fig_dd, 
+            st.session_state.fig_drift, 
+            st.session_state.fig_dist, 
+            st.session_state.horizon
+        )
+        st.download_button(
+            label="Download PDF Report",
+            data=pdf_buffer,
+            file_name="portfolio_report.pdf",
+            mime="application/pdf"
+        )
+
+# CSV Download
+if st.session_state.ran_simulation:
     csv_buffer = io.StringIO()
-    pd.DataFrame([results]).to_csv(csv_buffer, index=False)
+    pd.DataFrame([st.session_state.results]).to_csv(csv_buffer, index=False)
     st.download_button(
         label="Download Simulation Results as CSV",
         data=csv_buffer.getvalue(),

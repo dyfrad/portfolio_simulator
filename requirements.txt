@@ -6,4 +6,5 @@ matplotlib
 scipy
 plotly
 reportlab
+kaleido 
 watchdog
