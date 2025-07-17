@@ -1,4 +1,4 @@
-# Portfolio Simulator Dashboard
+# Portfolio Simulator
 
 ## Overview
 

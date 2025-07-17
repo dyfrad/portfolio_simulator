@@ -1,5 +1,5 @@
 """
-Portfolio Simulator Dashboard
+Portfolio Simulator
 
 Author: Mohit Saharan
 Email: mohit@msaharan.com
@@ -466,7 +466,7 @@ explanations = {
 }
 
 # Streamlit Dashboard
-st.title('Portfolio Simulator Dashboard')
+st.title('Portfolio Simulator')
 
 st.markdown("""
 This dashboard simulates the performance of a portfolio consisting of default assets:

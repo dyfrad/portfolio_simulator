@@ -1,8 +1,8 @@
-# Portfolio Simulator Dashboard Documentation
+# Portfolio Simulator Documentation
 
 ## Introduction
 
-The Portfolio Simulator Dashboard is a web-based application built using Streamlit, designed to simulate and analyze the performance of investment portfolios. It focuses on UCITS-compliant ETFs traded in EUR, allowing users to model portfolios with assets such as global equities (e.g., MSCI World via IWDA.AS), emerging markets (e.g., MSCI India via QDV5.DE), commodities (e.g., gold via PPFB.DE), and cash equivalents (e.g., XEON.DE). Users can customize portfolios by adding tickers, uploading holdings or transaction CSVs, and adjusting parameters like weights, time horizons, contributions, inflation, fees, taxes, rebalancing, and stress scenarios.
+The Portfolio Simulator is a web-based application built using Streamlit, designed to simulate and analyze the performance of investment portfolios. It focuses on UCITS-compliant ETFs traded in EUR, allowing users to model portfolios with assets such as global equities (e.g., MSCI World via IWDA.AS), emerging markets (e.g., MSCI India via QDV5.DE), commodities (e.g., gold via PPFB.DE), and cash equivalents (e.g., XEON.DE). Users can customize portfolios by adding tickers, uploading holdings or transaction CSVs, and adjusting parameters like weights, time horizons, contributions, inflation, fees, taxes, rebalancing, and stress scenarios.
 
 The application performs bootstrap Monte Carlo simulations for forward-looking projections, historical backtesting, portfolio optimization, and generates visualizations and reports. It incorporates realistic elements such as Dollar-Cost Averaging (DCA), Total Expense Ratio (TER), transaction fees, capital gains taxes, automatic rebalancing, and predefined stress tests.
 
