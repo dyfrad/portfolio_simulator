@@ -535,6 +535,8 @@ if st.sidebar.button('Run Simulation'):
             if len(all_tickers) > len(shock_factors):
                 avg_stock_shock = np.mean(shock_factors[:2])
                 shock_factors += [avg_stock_shock] * (len(all_tickers) - len(shock_factors))
+            if len(shock_factors) > len(all_tickers):
+                shock_factors = shock_factors[:len(all_tickers)]
             shock_factors = np.array(shock_factors)
             if stress_scenario == 'Inflation Spike':
                 inflation_rate = 0.08
