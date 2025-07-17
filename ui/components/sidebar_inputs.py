@@ -19,6 +19,7 @@ class SimulationConfig:
     optimize_weights: bool
     initial_investment: float
     base_invested: Optional[float]
+    has_uploaded_file: bool
     
     # Simulation parameters
     horizon: float
@@ -62,8 +63,11 @@ class SidebarInputs:
         # Portfolio configuration
         portfolio_config = self._render_portfolio_config()
         
-        # Simulation parameters
-        sim_params = self._render_simulation_parameters()
+        # Simulation parameters (pass initial_investment and file upload status from portfolio config)
+        sim_params = self._render_simulation_parameters(
+            portfolio_config.get('initial_investment', 100000.0),
+            portfolio_config.get('has_uploaded_file', False)
+        )
         
         # Costs and fees
         cost_params = self._render_cost_parameters()
@@ -129,7 +133,8 @@ class SidebarInputs:
             'weights': weights,
             'optimize_weights': optimize,
             'initial_investment': initial_investment,
-            'base_invested': base_invested
+            'base_invested': base_invested,
+            'has_uploaded_file': uploaded_file is not None
         }
     
     def _render_weight_inputs(self, all_tickers: List[str]) -> np.ndarray:
@@ -157,7 +162,7 @@ class SidebarInputs:
         
         return weights
     
-    def _render_simulation_parameters(self) -> dict:
+    def _render_simulation_parameters(self, calculated_initial_investment: float = 100000.0, has_uploaded_file: bool = False) -> dict:
         """Render simulation parameter inputs."""
         horizon = st.sidebar.number_input(
             'Time Horizon (1 - 10 Years, in steps of 0.25 year):', 
@@ -171,7 +176,10 @@ class SidebarInputs:
         
         initial_investment = st.sidebar.number_input(
             'Initial Investment (€)', 
-            min_value=0.0, value=100000.0, step=1000.0
+            min_value=0.0, 
+            value=calculated_initial_investment, 
+            step=1000.0,
+            disabled=has_uploaded_file
         )
         
         periodic_contrib = st.sidebar.number_input(
