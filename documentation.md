@@ -1,190 +1,209 @@
 # Portfolio Simulator Dashboard Documentation
 
-## Overview
+## Introduction
 
-This documentation provides a comprehensive guide to the Portfolio Simulator Dashboard, a Streamlit-based web application for simulating and analyzing investment portfolios. The dashboard supports interactive adjustments to portfolio weights, simulation parameters, and visualizations. It incorporates advanced features like inflation adjustment, Dollar-Cost Averaging (DCA), fees, taxes, rebalancing, stress scenarios, and backtesting.
+The Portfolio Simulator Dashboard is a web-based application built using Streamlit, designed to simulate and analyze the performance of investment portfolios. It focuses on UCITS-compliant ETFs traded in EUR, allowing users to model portfolios with assets such as global equities (e.g., MSCI World via IWDA.AS), emerging markets (e.g., MSCI India via QDV5.DE), commodities (e.g., gold via PPFB.DE), and cash equivalents (e.g., XEON.DE). Users can customize portfolios by adding tickers, uploading holdings or transaction CSVs, and adjusting parameters like weights, time horizons, contributions, inflation, fees, taxes, rebalancing, and stress scenarios.
 
-The application is designed for users interested in financial planning, particularly with UCITS-compliant ETFs traded in EUR. It uses historical data from Yahoo Finance via `yfinance` to perform bootstrap Monte Carlo simulations and historical backtests.
+The application performs bootstrap Monte Carlo simulations for forward-looking projections, historical backtesting, portfolio optimization, and generates visualizations and reports. It incorporates realistic elements such as Dollar-Cost Averaging (DCA), Total Expense Ratio (TER), transaction fees, capital gains taxes, automatic rebalancing, and predefined stress tests.
 
-Key aspects covered:
-- **Code-wise**: Breakdown of the Python code structure, key functions, and logic.
-- **Mathematics-wise**: Equations for risk metrics, returns, and simulations.
-- **Finance-wise**: Explanations of concepts like TER, DCA, rebalancing, stress testing, and tax implications.
-- **Technicalities**: Dependencies, setup, data handling, and limitations.
+This documentation provides a detailed explanation of the financial concepts, mathematical formulations, and programming implementation. Code snippets are included for key functions, with explanations of logic and potential edge cases.
 
-This documentation is provided in Markdown format. Save this content as `portfolio_simulator_docs.md` on your laptop and open it with a Markdown viewer (e.g., VS Code with Markdown preview, or convert to HTML/PDF using Pandoc). For equations, it uses LaTeX syntax (renderable in tools like Obsidian or Jupyter). Code snippets are highlighted for readability. Figures are described with placeholders; you can generate them by running the code and screenshotting the outputs.
+## Dependencies and Setup
 
-## Installation and Setup
+### Required Libraries
+The application relies on the following Python libraries:
+- `yfinance`: For fetching historical financial data from Yahoo Finance.
+- `numpy`: For numerical computations, including array operations and statistics.
+- `pandas`: For data manipulation, time series handling, and DataFrame operations.
+- `matplotlib`: For static plotting (e.g., histograms).
+- `streamlit`: For building the interactive web dashboard.
+- `scipy`: For optimization (e.g., minimizing negative Sharpe ratio).
+- `plotly`: For interactive visualizations (e.g., line charts, pie charts).
+- `reportlab`: For generating PDF reports.
+- `kaleido`: For exporting Plotly figures to static images in PDFs.
 
-### Dependencies
-The application requires the following Python libraries (as listed in the code):
-- `yfinance`: For fetching historical financial data.
-- `numpy`: For numerical computations.
-- `pandas`: For data manipulation.
-- `matplotlib`: For basic plotting.
-- `streamlit`: For the web dashboard.
-- `scipy`: For optimization (e.g., portfolio weight optimization).
-- `plotly`: For interactive charts.
-- `reportlab`: For PDF report generation.
-- `kaleido`: For exporting Plotly figures to images.
+These are listed in a `requirements.txt` file for deployment. No additional installations are needed beyond these, as the code interpreter environment includes them.
 
-Install them via pip (create a `requirements.txt` file with the list above and run `pip install -r requirements.txt`).
+### Running the Application
+To run locally:
+```
+streamlit run portfolio_simulator_dashboard.py
+```
+This launches a web server at `http://localhost:8501`.
 
-### How to Run Locally
-1. Save the provided code as `portfolio_simulator_dashboard.py`.
-2. Open a terminal in the file's directory.
-3. Run: `streamlit run portfolio_simulator_dashboard.py`.
-4. The dashboard will open in your browser (e.g., http://localhost:8501).
+For deployment to Streamlit Community Cloud (as of July 2025):
+1. Host the code in a GitHub repository (public or private with access granted).
+2. Navigate to https://share.streamlit.io/, sign in with GitHub.
+3. Deploy the app by selecting the repository, branch, and file path.
+4. Ensure `requirements.txt` is in the repository root.
+5. The service is free for public apps; manage secrets via app settings if needed.
 
-For deployment to Streamlit Community Cloud, follow the instructions in the code's docstring (requires a GitHub repo).
+Potential issues: Yahoo Finance API rate limits may cause delays for large datasets. Handle by caching data with `@st.cache_data`.
 
-### Data Sources
-- Historical prices: Fetched from Yahoo Finance using `yfinance.download()`.
-- Default tickers: IWDA.AS (MSCI World), QDV5.DE (MSCI India), PPFB.DE (Gold), XEON.DE (Cash).
-- ISIN to Ticker mapping: Hardcoded dictionary for transaction CSV support.
-- Limitations: No internet access in code execution tool (per guidelines), but `yfinance` requires internet when running locally.
+## Data Fetching and Preprocessing
 
-## Code Structure
+### Financial Concept: Historical Price Data
+Historical adjusted close prices are used to compute returns, reflecting dividends and splits. This assumes efficient markets where past performance informs future volatility but not expected returns (per the Efficient Market Hypothesis, Fama, 1970). Data is fetched from Yahoo Finance, which provides reliable, free access to ETF data.
 
-The code is structured as follows:
-- **Imports**: Libraries for data, math, plotting, and UI.
-- **Constants**: Default tickers, ISIN mappings, start date.
-- **Session State Initialization**: For caching simulation runs.
-- **Functions**: Data fetching, calculations, simulations, plotting, backtesting, optimization, PDF generation.
-- **Explanations Dictionary**: Tooltips for metrics.
-- **Streamlit UI**: Sidebar inputs, main display, buttons.
-- **Logic Flow**: Fetch data → Calculate returns → Run simulation/backtest → Display results/plots → Generate report.
+Mathematical Detail: Adjusted close \( P_{t, adj} \) accounts for corporate actions:
+\[
+P_{t, adj} = P_t \times \prod_{k=1}^{m} (1 + d_k + s_k)
+\]
+where \( d_k \) are dividends and \( s_k \) are split factors over \( m \) events.
 
-Key global variables:
-- `DEFAULT_TICKERS`: List of default assets.
-- `ISIN_TO_TICKER`: Mapping for transaction processing.
+Reference: Yahoo Finance documentation; "A Random Walk Down Wall Street" by Burton Malkiel for market efficiency.
 
-## Key Functions and Explanations
+### Code Implementation
+The `fetch_data` function downloads data:
+```python
+@st.cache_data
+def fetch_data(tickers, start_date, end_date=None):
+    data = yf.download(tickers, start=start_date, end=end_date)['Close'].dropna()
+    if len(data) < 252:
+        st.warning("Limited historical data available. Simulations may not be reliable.")
+    return data
+```
+- **Logic**: Uses `yfinance.download` for multi-ticker data. Drops NaNs to ensure complete datasets. Caches for performance. Warns if less than one year of data (252 trading days), as short histories reduce statistical reliability.
+- **Edge Cases**: Invalid tickers raise exceptions (handled upstream). No data before ETF inception leads to empty DataFrames, triggering errors in simulations.
 
-### 1. Data Fetching: `fetch_data(tickers, start_date, end_date=None)`
-   - **Code Snippet**:
-     ```python
-     @st.cache_data
-     def fetch_data(tickers, start_date, end_date=None):
-         data = yf.download(tickers, start=start_date, end=end_date)['Close'].dropna()
-         if len(data) < 252:
-             st.warning("Limited historical data available. Simulations may not be reliable.")
-         return data
-     ```
-   - **Code Explanation**: Uses Streamlit's caching decorator for efficiency. Downloads adjusted close prices, drops NaNs, and warns if less than 1 year of data (252 trading days).
-   - **Finance Explanation**: Focuses on 'Close' prices for total returns (including dividends via adjusted close). Assumes daily data for accuracy in simulations.
-   - **Technicalities**: Handles multiple tickers; end_date optional for full history.
+Returns are calculated with TER adjustment:
+```python
+def calculate_returns(data, ter=0.0):
+    returns = data.pct_change().dropna()
+    daily_ter = (ter / 100) / 252
+    returns -= daily_ter
+    return returns
+```
+- **Logic**: Computes daily percentage changes. Subtracts daily TER (annual TER prorated over 252 trading days) to model expense drag.
+- **Financial Concept**: TER represents ongoing fund costs (management fees, etc.). Subtracting it assumes constant drag, simplifying reality where TER varies.
+- **Math**: Daily return \( r_d = \frac{P_{t} - P_{t-1}}{P_{t-1}} - \frac{TER}{252} \).
 
-### 2. Returns Calculation: `calculate_returns(data, ter=0.0)`
-   - **Code Snippet**:
-     ```python
-     def calculate_returns(data, ter=0.0):
-         returns = data.pct_change().dropna()
-         daily_ter = (ter / 100) / 252  # Annual TER to daily deduction
-         returns -= daily_ter
-         return returns
-     ```
-   - **Code Explanation**: Computes percentage changes, subtracts daily TER (Total Expense Ratio) uniformly across assets.
-   - **Mathematics**:
-     Daily return: \( r_t = \frac{P_t - P_{t-1}}{P_{t-1}} \)
-     Adjusted: \( r_t' = r_t - \frac{\text{TER}}{252 \times 100} \)
-   - **Finance Explanation**: TER represents fund management fees (e.g., 0.2% annual). Subtracting it simulates net returns. Assumes constant TER; in reality, it varies by asset.
+## Portfolio Statistics
 
-### 3. Portfolio Statistics: `portfolio_stats(weights, returns, cash_ticker=...)`
-   - **Code Snippet** (truncated):
-     ```python
-     def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
-         port_returns = np.dot(weights)
-         mean_return = np.mean(port_returns))
-         annual_return = mean_return * 252
-         annual_vol = np.std(port_returns) * np.sqrt(252)
-         rf_rate = returns[cash_ticker].mean() * 252 if ... else 0
-         sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
-         # Sortino: downside std
-         downside_returns = port_returns.copy()
-         downside_returns[port_returns > 0] = 0
-         downside_std = np.std(downside_returns) * np.sqrt(252)
-         sortino = (annual_return - rf_rate) / downside_std if downside_std > 0 else 0
-         # Max Drawdown
-         cum_returns = np.cumprod(1 + port_returns)
-         peaks = np.maximum.accumulate(cum_returns)
-         drawdowns = (cum_returns / peaks) - 1
-         max_dd = drawdowns.min()
-         return annual_return, annual_vol, sharpe, sortino, max_dd
-     ```
-   - **Code Explanation**: Computes weighted returns, annualizes metrics, uses cash as risk-free rate. Handles edge cases like zero vol.
-   - **Mathematics**:
-     - Annual Return: \( \bar{r} \times 252 \)
-     - Volatility: \( \sigma = \sqrt{\(var(r_p) \times 252} \)
-     - Sharpe Ratio: \( S = \frac{\bar{r} - r_f}{\sigma} \)
-     - \( r_p = \) portfolio return
-     - \( r_f = \) risk-free rate
-     - \( \sigma = \) volatility
-     - Sortino Ratio: Similar to Sharpe but \( \sigma_down = \sqrt{\var(r_p[r_p < 0])} \times 252 \)
-     - Max Drawdown: \( \left( \frac{P_t}{P_\peak} - 1 \right)_{\min} \)
-   - **Finance Explanation**: Sharpe measures reward per unit risk; Sortino focuses on bad risk. Max DD shows worst loss, important for investor tolerance. Risk-free rate from cash proxy.
+### Financial Concepts
+- **Annual Return**: Geometric mean of returns, annualized.
+- **Volatility**: Standard deviation of returns, measuring dispersion (risk).
+- **Sharpe Ratio**: Excess return per unit of volatility, using cash as risk-free rate.
+- **Sortino Ratio**: Similar to Sharpe but penalizes only downside volatility.
+- **Max Drawdown**: Largest peak-to-trough loss, indicating worst-case resilience.
 
-### 4. Bootstrap Simulation: `bootstrap_simulation(...)`
-   - core function, long and complex.
-   - **Code Explanation**: Performs N bootstrap resamples of historical returns. Supports DCA (adds contributions periodically), inflation adjustment, fees (subtract per contrib), taxes (on gains), rebalancing (reset weights if drift > threshold), stress shocks (apply return shocks). Computes lump-sum for comparison, VaR/CVaR.
-   - **Mathematics**: Bootstrap: Sample with replacement from empirical distribution. Final value: \( V = V_0 \prod (1 + r) / (1 + i)^y + \sum contribs \), adjusted.
-     - VaR 95%: 5th percentile of losses.
-     - CVaR 95%: Mean of losses below VaR.
-   - **Finance Explanation**: Bootstrap assumes future like past (stationary). DCA reduces timing risk. Rebalancing maintains allocation but incurs (virtual) costs. Stress: Applies shocks e.g., -40% in equities for 2008 scenario. Taxes: Applied to realized gains at end (simplified, assumes no withdrawals).
+Mathematical Formulations:
+- Annual Return: \( R_a = \bar{r_d} \times 252 \), where \( \bar{r_d} \) is mean daily return.
+- Volatility: \( \sigma_a = \sigma_d \sqrt{252} \), assuming i.i.d. returns (not always true due to autocorrelation).
+- Sharpe: \( S = \frac{R_a - R_f}{\sigma_a} \), \( R_f \) from cash returns.
+- Sortino: \( So = \frac{R_a - R_f}{\sigma_{down}} \), where \( \sigma_{down} = \sqrt{\frac{\sum (r_d < 0) r_d^2}{n}} \sqrt{252} \).
+- Max Drawdown: \( MDD = \min \left( \frac{C_t}{P_t} - 1 \right) \), \( C_t \) cumulative return, \( P_t \) peak.
 
-### 5. Plotting Functions
-- e.g., `plot_results`: Histogram of final values with mean/median (Matplotlib).
-- `plot_historical_performance`: Cumulative returns line chart (Plotly).
-- `plot_weight_drift`: Tracks asset weights over time, shows max drift (Plotly).
-- `plot_drawdowns`: Filled area for drawdowns (Plotly).
-- **Figure Example**: For historical performance, the plot shows lines for each asset and dashed for portfolio. (Run code to view; save as PNG for local reference.)
+References: Sharpe (1966) for Sharpe ratio; Sortino & van der Meer (1991) for Sortino; "Fooled by Randomness" by Nassim Taleb for drawdown risks.
 
-### 6. Backtesting: `backtest_portfolio(...)`
-   - Simulates actual historical path with DCA, rebalancing, fees/taxes.
-   - **Finance Explanation**: Unlike simulation (random paths), backtest uses real sequence for "what if" analysis.
+### Code Implementation
+```python
+def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
+    port_returns = np.dot(returns, weights)
+    mean_return = np.mean(port_returns)
+    annual_return = mean_return * 252
+    annual_vol = np.std(port_returns) * np.sqrt(252)
+    rf_rate = returns[cash_ticker].mean() * 252 if cash_ticker in returns.columns else 0
+    sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
+    
+    downside_returns = port_returns.copy()
+    downside_returns[port_returns > 0] = 0
+    downside_std = np.std(downside_returns) * np.sqrt(252)
+    sortino = (annual_return - rf_rate) / downside_std if downside_std > 0 else 0
+    
+    cum_returns = np.cumprod(1 + port_returns)
+    peaks = np.maximum.accumulate(cum_returns)
+    drawdowns = (cum_returns / peaks) - 1
+    max_dd = drawdowns.min()
+    
+    return annual_return, annual_vol, sharpe, sortino, max_dd
+```
+- **Logic**: Computes weighted portfolio returns via dot product. Annualizes assuming 252 days. Handles zero volatility/downside with conditionals. Uses cumulative products for drawdowns.
+- **Edge Cases**: Zero weights or no data yield zero stats. Negative rf_rate possible in low-interest environments.
 
-### 7. Optimization: `optimize_weights(returns)`
-   - Uses `scipy.minimize` to maximize Sharpe (negative objective).
-   - Constraints: Weights sum to 1, bounds [0,1].
-   - **Mathematics**: Quadratic optimization: argmax \( S(w) \) s.t. \( \sum w = 1 \).
+## Bootstrap Monte Carlo Simulation
 
-### 8. PDF Report: `generate_pdf_report(...)`
-   - Uses ReportLab to create PDF with metrics and embedded charts (via Kaleido for image export).
+### Financial Concept: Bootstrap Simulation
+Bootstrap resampling draws random samples with replacement from historical returns to simulate future paths, preserving empirical distributions without assuming normality (Efron, 1979). It's non-parametric, suitable for fat-tailed financial returns. Incorporates DCA (periodic investments to mitigate timing risk), inflation adjustment (real returns), fees/taxes (drag on growth), rebalancing (maintain allocation), and stress shocks (exogenous events).
 
-### 9. UI Logic
-   - Sidebar: Inputs for params, file upload (holdings/transactions CSV).
-   - Handles uploads: Computes current value/weights from prices/cost basis.
-   - Button triggers simulation, stores in session state for persistence.
+Mathematical Detail:
+- Simulated path: Sample \( r_{1:d} \) from historical \( R \), compute \( V_T = V_0 \prod (1 + r_t) + \sum C_k \prod (1 + r_{k:d}) \), adjusted for inflation \( V_T / (1 + i)^T \).
+- VaR/CVaR: \( VaR_{95} = P_5(\tilde{r}) \times Inv \), \( CVaR_{95} = \bar{\tilde{r} | \tilde{r} \leq P_5} \times Inv \), where \( \tilde{r} \) are simulated total returns.
+- Rebalancing: If drift \( \max |w_c - w_t| > \theta \), reset \( v = V \cdot w_t \).
 
-## Mathematical Foundations
+References: "Bootstrap Methods and Their Application" by Davison & Hinkley; Investopedia on DCA and VaR.
 
-- **Returns and Compounding**: Cumulative return: \( \prod (1 + r_t) - 1 \).
-- **Inflation Adjustment**: Real value: \( V / (1 + i)^y \), where i = inflation rate, y = years.
-- **VaR/CVaR**: From simulated returns distribution.
-- **Rebalancing**: If |current_weight - target| > threshold, reset to target (assumes costless; real-world has transaction costs).
+### Code Implementation
+The core function is `bootstrap_simulation` (abridged for brevity):
+```python
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None):
+    # ... (initialization)
+    for i in range(num_simulations):
+        boot_sample = returns.sample(days, replace=True).reset_index(drop=True)
+        if shock_factors is not None:
+            # Apply shocks
+        # Lump-sum calculation
+        # DCA loop with contributions, rebalancing
+    # Compute stats: mean, median, VaR, CVaR, etc.
+    return results, sim_final_values
+```
+- **Logic**: Resamples daily returns. Applies shocks as additive factors. Simulates lump-sum and DCA separately. Rebalances by resetting values to target weights if threshold exceeded at frequency. Adjusts for inflation post-compounding. Taxes applied on gains only. Progress bar for UX.
+- **Edge Cases**: Zero contributions revert to lump-sum. Empty returns raise ValueError. Rebalancing ignores if total_value=0.
 
-## Finance Concepts
+## Visualizations
 
-- **DCA**: Invest fixed amount periodically to average costs.
-- **TER/Fees/Taxes**: Reduce net returns; e.g., TER deducted daily, transaction fee per buy, capital gains tax on profits.
-- **Rebalancing**: Prevents drift from target allocation, e.g., quarterly if drift >5%.
-- **Stress Scenarios**: Predefined shocks based on historical events (e.g., 2008: -40% equities).
-- **Backtesting vs Simulation**: Backtest = historical path; Simulation = random resamples for forward-looking.
+### Concepts
+- Histogram: Distribution of simulated outcomes, highlighting mean/median.
+- Cumulative Returns: \( CR_t = \prod (1 + r_{1:t}) \), for trend analysis.
+- Drawdowns: As above, filled area for visualization.
+- Weight Drift: Tracks \( w_t = v_t / V_t \), max deviation.
 
-## Limitations and Technicalities
+Uses Plotly for interactivity, Matplotlib for static.
 
-- Assumptions: Stationary returns, no dividends beyond adjusted close, simplified taxes (end-only, no losses carryover).
-- Performance: High simulations (e.g., 10k) may be slow; progress bar included.
-- Errors: Handles empty data, optimization failure.
-- Security: Local run only; no API keys needed.
+### Code
+Functions like `plot_results`, `plot_historical_performance`, `plot_drawdowns`, `plot_weight_drift` return figures. Logic: Compute cumulatives via `cumprod`, traces added to Plotly figures.
+
+## Backtesting
+
+### Concept
+Backtesting applies strategy to historical data for out-of-sample validation, avoiding lookahead bias. Includes DCA, rebalancing, fees/taxes.
+
+Math: Similar to simulation but deterministic: \( V_T = V_0 (1 + R_{hist}) + \sum C_k (1 + R_{k:T}) \), net of costs.
+
+Reference: "Evaluating Trading Strategies" by Campbell R. Harvey.
+
+### Code
+`backtest_portfolio` iterates over historical returns, applying contributions/rebalancing/taxes.
+
+## Portfolio Optimization
+
+### Concept
+Maximizes Sharpe via constrained optimization (Markowitz, 1952). Objective: Minimize -Sharpe, subject to \( \sum w = 1 \), \( 0 \leq w \leq 1 \).
+
+Reference: "Portfolio Selection" by Harry Markowitz.
+
+### Code
+Uses `scipy.optimize.minimize` with SLSQP solver implicitly.
+
+## PDF Report Generation
+
+Uses Reportlab to canvas text and images from figures. Logic: Draw metrics, embed PNGs from Plotly/Matplotlib.
+
+## User Interface and Session State
+
+Streamlit sidebar for inputs, columns for metrics with tooltips (explanations dict). Session state persists results post-simulation. Uploads handle CSVs for real portfolios, mapping ISIN to tickers.
+
+## Limitations and Scrutiny Points
+- Assumptions: Stationary returns (questionable in regime shifts); no slippage in rebalancing; simplified tax (flat on gains at end).
+- Financial Correctness: Bootstrap may underestimate tail risks; stress scenarios are stylized.
+- Programming: Potential overflows in large simulations; reliance on Yahoo data accuracy.
+- Extensions: Incorporate correlations explicitly or machine learning for return predictions.
 
 ## References
-
-- Sharpe Ratio: Sharpe, W. F. (1966). "Mutual Fund Performance". Journal of Business.
-- Sortino Ratio: Sortino, F. A., & Price, L. N. (1994). "Performance Measurement in a Downside Risk Framework". Journal of Investing.
-- Bootstrap Simulation: Efron, B. (1979). "Bootstrap Methods: Another Look at the Jackknife". Annals of Statistics.
-- Yahoo Finance API: https://pypi.org/project/yfinance/
-- Streamlit Docs: https://docs.streamlit.io/
-- Financial Concepts: Investopedia (e.g., https://www.investopedia.com/terms/d/dollarcostaveraging.asp for DCA).
-
-For figures, run the dashboard and export plots (e.g., Plotly has download button). If you need updates or clarifications, rerun with modifications.
+- Fama, E. F. (1970). Efficient Capital Markets: A Review of Theory and Empirical Work. Journal of Finance.
+- Sharpe, W. F. (1966). Mutual Fund Performance. Journal of Business.
+- Sortino, F. A., & van der Meer, R. (1991). Downside Risk. Journal of Portfolio Management.
+- Efron, B. (1979). Bootstrap Methods: Another Look at the Jackknife. Annals of Statistics.
+- Markowitz, H. (1952). Portfolio Selection. Journal of Finance.
+- Websites: Investopedia (for metrics), Yahoo Finance API docs.
+- Books: "Quantitative Investment Analysis" by DeFusco et al. (CFA Institute).
