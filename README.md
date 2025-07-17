@@ -6,6 +6,32 @@ This is a personal, locally-run Streamlit-based web dashboard for simulating and
 
 Originally cloned from the private repository at `github.com/dyfrad/portfolio_simulator` for personal use. This project is not intended for open-source distribution or public sharing. All modifications and usage are for private financial planning purposes only.
 
+## Project Structure
+
+The codebase has been refactored into a modular structure:
+
+```
+portfolio_simulator/
+├── portfolio_simulator.py          # Core simulation logic
+├── portfolio_simulator_ui.py       # Main UI entry point
+├── ui/                             # UI components
+│   ├── __init__.py
+│   ├── dashboard.py                # Main dashboard component
+│   └── components/                 # Reusable UI components
+│       ├── __init__.py
+│       ├── results_display.py      # Results visualization
+│       ├── sidebar_inputs.py       # Input controls
+│       └── state_manager.py        # State management
+├── reports/                        # Report generation
+│   ├── __init__.py
+│   ├── data_models.py              # Data structures for reports
+│   ├── factory.py                  # Report factory pattern
+│   └── pdf_generator.py            # PDF generation logic
+├── requirements.txt                # Python dependencies
+├── Dockerfile                      # Container configuration
+└── README.md                       # This file
+```
+
 ## Features
 
 - **Portfolio Allocation**: Adjust weights for default UCITS-compliant ETFs (e.g., IWDA.AS for MSCI World, QDV5.DE for MSCI India, PPFB.DE for Gold, XEON.DE for Cash) or add custom tickers.
@@ -59,12 +85,16 @@ kaleido
 
 Run the dashboard locally:
 ```
-streamlit run portfolio_simulator_dashboard.py
+streamlit run portfolio_simulator_ui.py
 ```
 
 This will launch the app in your default web browser (typically at `http://localhost:8501`).
 
-- For development or debugging, you can edit the code in `portfolio_simulator_dashboard.py`.
+- For development or debugging, you can edit the code in the modular structure:
+  - Main UI logic: `portfolio_simulator_ui.py`
+  - Core simulation: `portfolio_simulator.py`
+  - UI components: `ui/dashboard.py` and `ui/components/`
+  - Report generation: `reports/`
 - Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
 
 ## Running with Docker
@@ -114,6 +144,21 @@ This setup ensures all dependencies are contained and the app runs consistently 
 - **Cache**: Uses Streamlit's `@st.cache_data` for data fetching to improve performance.
 - **Session State**: Tracks simulation runs to avoid re-computation.
 
+## Development
+
+The refactored codebase follows a modular architecture:
+
+- **Core Logic**: `portfolio_simulator.py` contains the main simulation engine
+- **UI Layer**: `portfolio_simulator_ui.py` serves as the entry point, importing from the `ui` module
+- **Components**: Reusable UI components are organized in `ui/components/`
+- **Reports**: Report generation logic is separated into the `reports/` module
+
+To extend functionality:
+- Add new UI components in `ui/components/`
+- Modify simulation logic in `portfolio_simulator.py`
+- Update report templates in `reports/`
+- Configure defaults in `portfolio_simulator_ui.py`
+
 ## Troubleshooting
 
 - **Data Fetch Errors**: Ensure tickers are valid and Yahoo Finance is accessible. If data is limited (<252 days), a warning appears.
@@ -122,6 +167,7 @@ This setup ensures all dependencies are contained and the app runs consistently 
 - **PDF Generation**: Requires images to be exportable; ensure Kaleido is installed correctly.
 - **Performance**: High simulation counts (e.g., 10,000) may take time; reduce for quicker runs.
 - **Docker Issues**: Ensure Docker is running and ports are free. If building fails, check for missing files or network issues during pip install.
+- **Import Errors**: If you encounter module import issues, ensure all `__init__.py` files are present in the `ui/` and `reports/` directories.
 
 ## Notes for Personal Use
 
@@ -137,7 +183,7 @@ If you want to deploy to Streamlit Community Cloud for easier access (e.g., on m
 
 1. Make your GitHub repo private (or use a personal access token).
 2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with GitHub.
-3. Deploy the app, specifying the file path (e.g., `portfolio_simulator_dashboard.py`).
+3. Deploy the app, specifying the file path (e.g., `portfolio_simulator_ui.py`).
 4. Add `requirements.txt` to the repo.
 5. Note: Free for personal apps, but keep it private.
 
