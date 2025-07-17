@@ -1,6 +1,9 @@
 """
 Portfolio Simulator Dashboard
 
+Author: Mohit Saharan
+Email: mohit@msaharan.com
+
 This is a Streamlit-based web dashboard for the Portfolio Simulator application.
 It allows users to interactively adjust portfolio weights, simulation parameters,
 and view results and visualizations locally.
@@ -609,6 +612,12 @@ stress_scenario = st.sidebar.selectbox('Stress Scenario', ['None', '2008 Recessi
 
 start_date = st.sidebar.text_input('Start Date (YYYY-MM-DD)', DEFAULT_START_DATE)
 backtest_end_date = st.sidebar.text_input('Backtest End Date (YYYY-MM-DD, optional)', '')
+
+# Author information
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Author Information**")
+st.sidebar.markdown("**Mohit Saharan**")
+st.sidebar.markdown("mohit@msaharan.com")
 
 # Run button
 if st.sidebar.button('Run Simulation'):
