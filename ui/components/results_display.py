@@ -18,7 +18,10 @@ class ResultsDisplay:
     
     def render_all_results(self, session_data: Dict[str, Any]):
         """Render all results sections."""
-        # Display simulation results (pie charts already displayed during simulation)
+        # Display optimized portfolio allocation if available
+        self._render_optimized_allocation(session_data)
+        
+        # Display simulation results
         self._render_simulation_metrics(session_data['results'])
         
         # Plot simulation distribution
@@ -206,6 +209,29 @@ class ResultsDisplay:
                 file_name="portfolio_report.pdf",
                 mime="application/pdf"
             )
+    
+    def _render_optimized_allocation(self, session_data: Dict[str, Any]):
+        """Render optimized portfolio allocation section."""
+        if session_data.get('fig_pie_optimized'):
+            st.header('Optimized Portfolio Allocation')
+            
+            # Display optimized pie chart
+            st.plotly_chart(session_data['fig_pie_optimized'], key="pie_chart_optimized_results")
+            
+            # Display optimized weights table
+            optimized_weights = st.session_state.get('optimized_weights')
+            all_tickers = st.session_state.get('all_tickers')
+            
+            if optimized_weights is not None and all_tickers is not None:
+                # Create table of optimized weights
+                weights_df = pd.DataFrame({
+                    'Ticker': all_tickers,
+                    'Optimized Weight': [f"{w:.4f}" for w in optimized_weights],
+                    'Percentage': [f"{w*100:.2f}%" for w in optimized_weights]
+                })
+                
+                st.subheader('Optimized Weights')
+                st.dataframe(weights_df, use_container_width=True)
     
     def _render_csv_download_button(self, results: Dict[str, float]):
         """Render CSV download button."""

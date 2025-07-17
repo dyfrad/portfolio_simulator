@@ -101,26 +101,17 @@ class PortfolioDashboard:
             if config.stress_scenario != 'None':
                 st.info(f'Simulating under {config.stress_scenario} stress conditions.')
             
-            # Create pie charts for original and optimized weights
+            # Create original pie chart and display it immediately
             fig_pie_original = px.pie(values=config.weights, names=config.all_tickers, title='Original Portfolio Allocation')
+            st.plotly_chart(fig_pie_original, key="pie_chart_original")
+            st.session_state.fig_pie_original = fig_pie_original
             
+            # Store optimization info for later display
             if config.optimize_weights:
                 fig_pie_optimized = px.pie(values=weights, names=config.all_tickers, title='Optimized Portfolio Allocation')
-                
-                # Display both charts side by side
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.plotly_chart(fig_pie_original, key="pie_chart_original", use_container_width=True)
-                with col2:
-                    st.plotly_chart(fig_pie_optimized, key="pie_chart_optimized", use_container_width=True)
-                
-                # Store both charts for later use
-                st.session_state.fig_pie_original = fig_pie_original
                 st.session_state.fig_pie_optimized = fig_pie_optimized
-            else:
-                # Display only original chart if no optimization
-                st.plotly_chart(fig_pie_original, key="pie_chart_original")
-                st.session_state.fig_pie_original = fig_pie_original
+                st.session_state.optimized_weights = weights
+                st.session_state.all_tickers = config.all_tickers
             
             # Show progress indicator
             progress_bar = st.progress(0)
