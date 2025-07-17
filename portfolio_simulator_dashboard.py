@@ -3,48 +3,6 @@ Portfolio Simulator
 
 Author: Mohit Saharan
 Email: mohit@msaharan.com
-
-This is a Streamlit-based web dashboard for the Portfolio Simulator application.
-It allows users to interactively adjust portfolio weights, simulation parameters,
-and view results and visualizations locally.
-
-New Features Added:
-- Inflation Adjustment: Input for expected annual inflation rate; adjusts final values.
-- Custom Assets: Allow adding custom tickers (UCITS ETFs) via text input.
-- More Visuals: Line chart for historical cumulative returns of the portfolio and assets.
-- Backtesting: Simulate historical portfolio performance over a selected period.
-- Deployment Instructions: See below for deploying to Streamlit Community Cloud.
-- DCA Simulation and Backtesting: Support for monthly/quarterly contributions in simulations and backtests.
-- Fees and Taxes: Incorporate TER, transaction fees, and capital gains tax for more realistic projections.
-- Automatic Rebalancing: Option to simulate rebalancing at specified frequency and threshold, with drift visualization.
-- Advanced Risk Metrics: Added Sortino ratio and max drawdown to historical and backtest stats.
-- Stress Scenarios: Dropdown for predefined stress tests (e.g., 2008 Recession) with return shocks in simulations.
-- Drawdown Visualization: Plot of historical portfolio drawdown curves.
-- Portfolio Upload: Upload CSV with holdings (Ticker, Shares, Cost Basis); fetch real-time prices to derive current value, weights, and use as simulation base.
-- Transaction CSV Support: Upload transaction history CSV to compute current holdings, cost basis, and map ISIN to tickers.
-- Educational Tooltips: Added help tooltips to metrics for explanations.
-- Report Generation: Button to generate and download a PDF report with metrics and charts.
-
-To run locally: `streamlit run this_file.py`
-
-For Deployment to Streamlit Community Cloud (as of July 2025):
-1. Ensure your GitHub repo is public (or private with access granted).
-2. Go to https://share.streamlit.io/, sign in with GitHub.
-3. Click 'Deploy an app' > Connect to GitHub > Select your repo and branch.
-4. Specify the file path (e.g., portfolio_simulator_dashboard.py).
-5. Add a requirements.txt file in your repo with dependencies:
-   streamlit
-   yfinance
-   numpy
-   pandas
-   matplotlib
-   scipy
-   plotly
-   reportlab
-   kaleido
-6. Deploy—it's free for public apps. For secrets (if any), use the app's settings.
-
-Dependencies: yfinance, numpy, pandas, matplotlib, streamlit, scipy, plotly, reportlab, kaleido
 """
 
 import yfinance as yf
