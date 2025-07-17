@@ -18,10 +18,7 @@ class ResultsDisplay:
     
     def render_all_results(self, session_data: Dict[str, Any]):
         """Render all results sections."""
-        # Display allocation pie chart
-        st.plotly_chart(session_data['fig_pie'])
-        
-        # Display simulation results
+        # Display simulation results (pie chart already displayed during simulation)
         self._render_simulation_metrics(session_data['results'])
         
         # Plot simulation distribution

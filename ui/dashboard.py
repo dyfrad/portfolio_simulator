@@ -97,9 +97,12 @@ class PortfolioDashboard:
             if config.stress_scenario != 'None':
                 st.info(f'Simulating under {config.stress_scenario} stress conditions.')
             
-            # Create and display pie chart immediately
+            # Create pie chart immediately and store for later display
             fig_pie = px.pie(values=weights, names=config.all_tickers, title='Portfolio Allocation')
-            st.plotly_chart(fig_pie)
+            
+            # Store pie chart in session state for immediate display
+            st.session_state.fig_pie = fig_pie
+            st.plotly_chart(fig_pie, key="pie_chart_immediate")
             
             # Show progress indicator
             progress_bar = st.progress(0)
