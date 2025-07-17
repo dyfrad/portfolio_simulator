@@ -88,7 +88,7 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     
     return annual_return, annual_vol, sharpe, sortino, max_dd
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, periodic_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None):
     """
     Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, rebalancing, and stress shocks.
     """
@@ -133,10 +133,10 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
             values *= np.prod(1 + period_returns, axis=0)
             total_value = np.sum(values)
             if d + contrib_days < days:
-                effective_contrib = monthly_contrib - transaction_fee
+                effective_contrib = periodic_contrib - transaction_fee
                 contrib_per_asset = effective_contrib * weights
                 values += contrib_per_asset
-                total_invested += monthly_contrib
+                total_invested += periodic_contrib
             # Rebalance if enabled and at interval
             if rebalance and (d % rebalance_days == 0 or d + contrib_days >= days):
                 current_weights = values / total_value if total_value > 0 else weights
@@ -159,8 +159,8 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
     mean_final = np.mean(sim_final_values)
     median_final = np.median(sim_final_values)
     std_final = np.std(sim_final_values)
-    var_95 = np.percentile(sim_port_returns, 5) * (initial_investment + monthly_contrib * (days // contrib_days))
-    cvar_95 = np.mean(sim_port_returns[sim_port_returns <= np.percentile(sim_port_returns, 5)]) * (initial_investment + monthly_contrib * (days // contrib_days))
+    var_95 = np.percentile(sim_port_returns, 5) * (initial_investment + periodic_contrib * (days // contrib_days))
+    cvar_95 = np.mean(sim_port_returns[sim_port_returns <= np.percentile(sim_port_returns, 5)]) * (initial_investment + periodic_contrib * (days // contrib_days))
     
     mean_final_lump = np.mean(sim_final_values_lump)
     
@@ -261,7 +261,7 @@ def plot_drawdowns(returns, weights):
     fig.update_layout(title='Historical Portfolio Drawdown', xaxis_title='Date', yaxis_title='Drawdown')
     return fig
 
-def backtest_portfolio(data, weights, initial_investment, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
+def backtest_portfolio(data, weights, initial_investment, periodic_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05):
     """
     Backtest portfolio over historical data with optional DCA, fees, taxes, and rebalancing.
     """
@@ -292,7 +292,7 @@ def backtest_portfolio(data, weights, initial_investment, monthly_contrib=0.0, c
     
     # DCA backtest
     cum_port_returns_dca = net_cum_port_returns  # Default to lump if no DCA
-    if monthly_contrib > 0:
+    if periodic_contrib > 0:
         freq = 'M' if contrib_frequency == 'monthly' else 'Q'
         monthly_data = data.resample(freq).last()
         monthly_returns = monthly_data.pct_change().dropna()
@@ -300,9 +300,9 @@ def backtest_portfolio(data, weights, initial_investment, monthly_contrib=0.0, c
         value = 0.0
         total_invested = 0.0
         for ret in port_monthly_returns:
-            effective_contrib = monthly_contrib - transaction_fee
+            effective_contrib = periodic_contrib - transaction_fee
             value = (value + effective_contrib) * (1 + ret)
-            total_invested += monthly_contrib
+            total_invested += periodic_contrib
         cum_port_returns_dca = (value / total_invested) - 1 if total_invested > 0 else 0
         # Apply tax on gains for DCA
         gains_dca = value - total_invested
@@ -557,7 +557,7 @@ if uploaded_file is None:
 horizon = st.sidebar.number_input('Time Horizon (1 - 10 Years, in steps of 0.25 year):', min_value=1.0, max_value=10.0, value=5.0, step=0.25)
 simulations = st.sidebar.number_input('Number of Simulations (100 - 10000, in steps of 100)', min_value=100, max_value=10000, value=1000, step=100)
 initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0 if uploaded_file is None else initial_investment, step=1000.0, disabled=uploaded_file is not None)  # Allow 0 for pure DCA
-monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
+periodic_contrib = st.sidebar.number_input('Periodic Contribution (€)', min_value=0.0, value=0.0, step=100.0)
 contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
 inflation_rate = st.sidebar.number_input('Expected Annual Inflation Rate (0 - 20 %, in steps of 0.1%)', min_value=0.0, max_value=20.0, value=2.0, step=0.1) / 100
 
@@ -619,7 +619,7 @@ if st.sidebar.button('Run Simulation'):
 
         # Run simulation with inflation, DCA, fees, tax, rebalancing, stress
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors, base_invested
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, periodic_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors, base_invested
         )
         
         fig_dist = plot_results(sim_final_values, horizon, results)
@@ -633,7 +633,7 @@ if st.sidebar.button('Run Simulation'):
         # Backtesting with DCA, fees, tax, rebalancing
         backtest_end = backtest_end_date if backtest_end_date else None
         backtest_data = fetch_data(all_tickers, start_date, backtest_end)
-        backtest_results = backtest_portfolio(backtest_data, weights, initial_investment, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
+        backtest_results = backtest_portfolio(backtest_data, weights, initial_investment, periodic_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold)
 
         # Store in session state
         st.session_state.results = results
