@@ -2,98 +2,123 @@
 
 ## Overview
 
-This is a Streamlit-based web application for simulating and analyzing portfolio performance. It supports Monte Carlo simulations using bootstrap resampling to account for uncertainties and risks in asset returns. The dashboard focuses on UCITS-compliant ETFs traded in EUR, with default assets including MSCI World, MSCI India, Gold, and Cash. Users can customize portfolios, optimize weights, adjust for inflation, backtest historical performance, and visualize results.
+This is a personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios. It allows interactive adjustments to portfolio weights, simulation parameters, and visualizations of results. The application supports features like inflation adjustment, Dollar-Cost Averaging (DCA), custom assets, backtesting, fees/taxes, rebalancing, stress scenarios, and report generation.
 
-The application is designed to run locally on your computer but can be deployed to the cloud for sharing.
+Originally cloned from the private repository at `github.com/dyfrad/portfolio_simulator` for personal use. This project is not intended for open-source distribution or public sharing. All modifications and usage are for private financial planning purposes only.
 
 ## Features
 
-- **Interactive Portfolio Configuration**: Adjust weights for default or custom assets, with automatic normalization.
-- **Monte Carlo Simulations**: Bootstrap-based simulations for future performance, including risk metrics like VaR, CVaR, expected returns, and volatility.
-- **Inflation Adjustment**: Input an expected annual inflation rate to compute real (inflation-adjusted) final values.
-- **Weight Optimization**: Maximize Sharpe ratio using historical data via SciPy.
-- **Custom Assets**: Add your own ETF tickers (e.g., other UCITS funds) for flexible portfolios.
-- **Historical Visualizations**: Line charts showing cumulative returns for the portfolio and individual assets.
-- **Backtesting**: Evaluate historical performance over a user-defined period, with metrics like total return, annualized return/volatility, and Sharpe.
-- **Results Export**: Download simulation results as CSV.
-- **Caching**: Efficient data fetching with Streamlit caching for faster reruns.
+- **Portfolio Allocation**: Adjust weights for default UCITS-compliant ETFs (e.g., IWDA.AS for MSCI World, QDV5.DE for MSCI India, PPFB.DE for Gold, XEON.DE for Cash) or add custom tickers.
+- **Inflation Adjustment**: Input expected annual inflation rate to adjust final values.
+- **Custom Assets**: Add custom tickers via text input.
+- **Visualizations**: Line charts for historical cumulative returns, drawdown curves, weight drift, and simulation outcome distributions.
+- **Backtesting**: Simulate historical performance over a selected period, including DCA.
+- **DCA Support**: Monthly/quarterly contributions in simulations and backtests.
+- **Fees and Taxes**: Incorporate Total Expense Ratio (TER), transaction fees, and capital gains tax.
+- **Rebalancing**: Automatic rebalancing at specified frequency and threshold, with drift visualization.
+- **Advanced Metrics**: Sharpe ratio, Sortino ratio, max drawdown, VaR, CVaR.
+- **Stress Scenarios**: Predefined tests like 2008 Recession or COVID Crash.
+- **Portfolio Upload**: Upload CSV for holdings (Ticker, Shares, Cost Basis) or transaction history to compute current value and weights.
+- **Educational Tooltips**: Help explanations for metrics.
+- **Report Generation**: Download PDF reports with metrics and charts.
 
 ## Installation
 
-1. **Clone the Repository**:
+Since this is a cloned repository for personal use:
+
+1. Ensure you have Python 3.8+ installed.
+2. Clone the repository (already done):
    ```
-   git clone https://github.com/dyfrad/portfolio_simulator.git
+   git clone git@github.com:dyfrad/portfolio_simulator.git
    cd portfolio_simulator
    ```
-
-2. **Set Up a Virtual Environment** (Recommended):
+3. Create a virtual environment (optional but recommended):
    ```
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-
-3. **Install Dependencies**:
-   Create a `requirements.txt` file with the following content:
-   ```
-   streamlit
-   yfinance
-   numpy
-   pandas
-   matplotlib
-   scipy
-   plotly
-   ```
-   Then run:
+4. Install dependencies from `requirements.txt` (create one if not present):
    ```
    pip install -r requirements.txt
    ```
 
+### requirements.txt Content
+```
+streamlit
+yfinance
+numpy
+pandas
+matplotlib
+scipy
+plotly
+reportlab
+kaleido
+```
+
+## Running the Application
+
+Run the dashboard locally:
+```
+streamlit run portfolio_simulator_dashboard.py
+```
+
+This will launch the app in your default web browser (typically at `http://localhost:8501`).
+
+- For development or debugging, you can edit the code in `portfolio_simulator_dashboard.py`.
+- Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
+
 ## Usage
 
-1. **Run Locally**:
-   ```
-   streamlit run portfolio_simulator_dashboard.py
-   ```
-   This will launch the dashboard in your browser (usually at http://localhost:8501).
+1. **Sidebar Inputs**:
+   - Adjust weights, time horizon, simulations, initial investment, contributions, inflation, fees/taxes, rebalancing, and stress scenarios.
+   - Upload a CSV for portfolio holdings or transactions to auto-populate weights and values.
+   - Optional: Optimize weights for maximum Sharpe ratio.
 
-2. **Interact with the Dashboard**:
-   - Use the sidebar to configure parameters: weights, time horizon, simulations, initial investment, inflation rate, start/end dates, and custom tickers.
-   - Check "Optimize Weights for Max Sharpe" for automatic allocation.
-   - Click "Run Simulation" to generate results, visualizations, and backtest metrics.
-   - Download results via the CSV button after a successful run.
+2. **Run Simulation**:
+   - Click "Run Simulation" to generate results, metrics, and charts.
+   - View historical performance, drawdowns, weight drift, and outcome distributions.
 
-3. **Example Scenario**:
-   - Set weights: 40% MSCI World, 30% MSCI India, 20% Gold, 10% Cash.
-   - Horizon: 5 years, Simulations: 5000, Inflation: 2%.
-   - Start Date: 2015-01-01, Backtest End Date: 2024-12-31.
-   - Run to see simulated outcomes, historical charts, and backtest performance.
+3. **Backtesting**:
+   - Automatically runs with simulation; shows historical returns, volatility, etc.
 
-## Backtesting Guide
+4. **Reports**:
+   - Generate and download a PDF report with key metrics and visualizations.
+   - Download simulation results as CSV.
 
-- **Purpose**: Test how the portfolio would have performed historically.
-- **Inputs**: Use "Start Date" and "Backtest End Date" in the sidebar.
-- **Output**: Metrics like Total Return, Annualized Return, Volatility, and Sharpe Ratio appear in the "Backtesting Results" section after running.
-- **Tip**: Leave End Date blank for data up to the current date. Ensure the period has enough data for accurate results.
+5. **Customization**:
+   - Add custom tickers in the sidebar (comma-separated).
+   - Modify default tickers or ISIN mappings in the code if needed.
+   - Extend features by editing functions (e.g., add new stress scenarios).
 
-## Deployment
+## Configuration
 
-To deploy to Streamlit Community Cloud (free for public apps):
-1. Make your GitHub repo public.
-2. Visit [share.streamlit.io](https://share.streamlit.io), sign in with GitHub.
-3. Deploy a new app: Select your repo, branch, and file (e.g., `portfolio_simulator_dashboard.py`).
-4. Ensure `requirements.txt` is in the repo root.
-5. Deploy—the app will be live at a URL like `https://your-app-name.streamlit.app`.
+- **Default Start Date**: '2015-01-01' (editable in sidebar).
+- **ISIN to Ticker Mapping**: Hardcoded in the code; update the `ISIN_TO_TICKER` dictionary for additional assets.
+- **Cache**: Uses Streamlit's `@st.cache_data` for data fetching to improve performance.
+- **Session State**: Tracks simulation runs to avoid re-computation.
 
-For other platforms (e.g., Heroku, Render), follow their Python/Streamlit guides.
+## Troubleshooting
 
-## Dependencies
+- **Data Fetch Errors**: Ensure tickers are valid and Yahoo Finance is accessible. If data is limited (<252 days), a warning appears.
+- **Optimization Failure**: Falls back to equal weights if Sharpe optimization fails.
+- **PDF Generation**: Requires images to be exportable; ensure Kaleido is installed correctly.
+- **Performance**: High simulation counts (e.g., 10,000) may take time; reduce for quicker runs.
 
-- Python 3.8+
-- See `requirements.txt` for libraries.
+## Notes for Personal Use
 
-## Limitations
+- This tool uses historical data for simulations and assumes no guarantees on future performance. It's for educational and planning purposes only—not financial advice.
+- Backup your local repository regularly.
+- If modifying the code, test changes locally before relying on outputs.
+- No external APIs or keys are required, but respect Yahoo Finance's terms of service for data usage.
 
-- Relies on yfinance for data—may have rate limits or occasional downtime.
-- Simulations are historical-based; not financial advice—use at your own risk.
-- Custom tickers must be valid yfinance symbols with overlapping data.
+## Deployment (Optional, for Personal Cloud Use)
 
+If you want to deploy to Streamlit Community Cloud for easier access (e.g., on mobile):
+
+1. Make your GitHub repo private (or use a personal access token).
+2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with GitHub.
+3. Deploy the app, specifying the file path (e.g., `portfolio_simulator_dashboard.py`).
+4. Add `requirements.txt` to the repo.
+5. Note: Free for personal apps, but keep it private.
+
+For questions or issues, refer to the code comments or Streamlit documentation.
