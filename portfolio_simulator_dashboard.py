@@ -17,6 +17,8 @@ New Features Added:
 - Advanced Risk Metrics: Added Sortino ratio and max drawdown to historical and backtest stats.
 - Stress Scenarios: Dropdown for predefined stress tests (e.g., 2008 Recession) with return shocks in simulations.
 - Drawdown Visualization: Plot of historical portfolio drawdown curves.
+- Portfolio Upload: Upload CSV with holdings (Ticker, Shares, Cost Basis); fetch real-time prices to derive current value, weights, and use as simulation base.
+- Transaction CSV Support: Upload transaction history CSV to compute current holdings, cost basis, and map ISIN to tickers.
 
 To run locally: `streamlit run this_file.py`
 
@@ -50,6 +52,22 @@ import plotly.graph_objects as go
 
 # Default tickers for the assets (UCITS-compliant, EUR-traded)
 DEFAULT_TICKERS = ['IWDA.AS', 'QDV5.DE', 'PPFB.DE', 'XEON.DE']  # MSCI World, MSCI India, Gold, Cash
+
+# ISIN to Ticker mapping
+ISIN_TO_TICKER = {
+    'IE00B4L5Y983': 'IWDA.AS',
+    'IE00BHZRQZ17': 'FLXI.DE',
+    'IE00B4ND3602': 'PPFB.DE',
+    'IE00BZCQB185': 'QDV5.DE',
+    'IE00B5BMR087': 'SXR8.DE',
+    'IE00B3XXRP09': 'VUSA.AS',
+    'US67066G1040': 'NVD.DE',
+    'IE00BFY0GT14': 'SPPW.DE',
+    'NL0010273215': 'ASML.AS',
+    'IE000RHYOR04': 'ERNX.DE',
+    'IE00B3FH7618': 'IEGE.MI',
+    'LU0290358497': 'XEON.DE'
+}
 
 # Default start date for historical data
 DEFAULT_START_DATE = '2015-01-01'
@@ -98,10 +116,12 @@ def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
     
     return annual_return, annual_vol, sharpe, sortino, max_dd
 
-def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None):
+def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None):
     """
     Perform bootstrap Monte Carlo simulation with optional inflation adjustment, DCA, fees, taxes, rebalancing, and stress shocks.
     """
+    if base_invested is None:
+        base_invested = initial_investment
     days = int(252 * time_horizon_years)
     contrib_days = 21 if contrib_frequency == 'monthly' else 63  # Approx trading days per month/quarter
     rebalance_days = 252 if rebalance_frequency == 'annual' else 63  # Annual or quarterly
@@ -128,14 +148,14 @@ def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, 
         compounded_return = np.prod(1 + boot_port_returns) - 1
         adjusted_return_lump = (1 + compounded_return) / (1 + inflation_rate)**time_horizon_years - 1
         final_value_lump = initial_investment * (1 + adjusted_return_lump)
-        gains_lump = final_value_lump - initial_investment
-        net_final_lump = initial_investment + gains_lump * (1 - tax_rate) if gains_lump > 0 else final_value_lump
+        gains_lump = final_value_lump - base_invested
+        net_final_lump = base_invested + gains_lump * (1 - tax_rate) if gains_lump > 0 else final_value_lump
         sim_final_values_lump.append(net_final_lump)
         
         # DCA with optional rebalancing
-        values = np.full(len(weights), initial_investment / len(weights)) if initial_investment > 0 else np.zeros(len(weights))
+        values = initial_investment * weights
         total_value = initial_investment
-        total_invested = initial_investment
+        total_invested = base_invested
         for d in range(0, days, contrib_days):
             period_returns = boot_sample.iloc[d:d+contrib_days]
             values *= np.prod(1 + period_returns, axis=0)
@@ -229,7 +249,7 @@ def plot_weight_drift(returns, target_weights, rebalance=False, rebalance_freque
     Plot weight drift over time, with optional rebalancing.
     """
     num_assets = len(target_weights)
-    values = np.full(num_assets, 1.0 / num_assets)  # Start with equal value per asset (total 1)
+    values = target_weights  # Start with weights (total 1)
     drift_data = pd.DataFrame(index=returns.index, columns=['Drift'] + [f'Weight {i}' for i in range(num_assets)])
     rebalance_days = 252 if rebalance_frequency == 'annual' else 63
     day_count = 0
@@ -275,7 +295,7 @@ def backtest_portfolio(data, weights, monthly_contrib=0.0, contrib_frequency='mo
     """
     returns = calculate_returns(data)
     num_assets = len(weights)
-    values = np.full(num_assets, initial_investment / num_assets) if initial_investment > 0 else np.zeros(num_assets)
+    values = initial_investment * weights
     total_value = initial_investment
     total_invested = initial_investment
     rebalance_days = 252 if rebalance_frequency == 'annual' else 63
@@ -360,24 +380,112 @@ all_tickers = DEFAULT_TICKERS.copy()
 if custom_tickers:
     all_tickers.extend([t.strip() for t in custom_tickers.split(',')])
 
-# Weights input (dynamic based on tickers)
-st.sidebar.subheader('Portfolio Weights')
-weights = []
-cols = st.sidebar.columns(2)
-for i, ticker in enumerate(all_tickers):
-    col = cols[i % 2]
-    weight = col.number_input(ticker, min_value=0.0, max_value=1.0, value=1.0/len(all_tickers), step=0.05)
-    weights.append(weight)
+uploaded_file = st.sidebar.file_uploader("Upload Portfolio CSV (Ticker, Shares, Cost Basis) or Transactions CSV", type="csv")
 
-weights = np.array(weights)
-total_weight = np.sum(weights)
-if total_weight != 1.0:
-    weights = weights / total_weight
-    st.sidebar.warning(f'Weights normalized to sum to 1: {weights.round(2)}')
+initial_investment = 100000.0
+base_invested = None
+weights = None
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    if set(['Ticker', 'Shares', 'Cost Basis']).issubset(df.columns):
+        # Holdings CSV
+        required_cols = ['Ticker', 'Shares', 'Cost Basis']
+        df_group = df.groupby('Ticker').agg({'Shares': 'sum', 'Cost Basis': 'sum'}).reset_index()
+        try:
+            current_prices = yf.download(list(df_group['Ticker']), period='1d')['Close'].iloc[-1]
+            df_group['Current Price'] = df_group['Ticker'].map(current_prices)
+            df_group['Current Value'] = df_group['Shares'] * df_group['Current Price']
+            total_value = df_group['Current Value'].sum()
+            df_group['Weight'] = df_group['Current Value'] / total_value
+            df_group['Unrealized Gain'] = df_group['Current Value'] - df_group['Cost Basis']
+            st.header('Current Portfolio')
+            st.dataframe(df_group)
+            all_tickers = list(df_group['Ticker'])
+            weights = df_group['Weight'].values
+            initial_investment = total_value
+            base_invested = df_group['Cost Basis'].sum()
+        except Exception as e:
+            st.error(f"Error fetching current prices: {e}")
+    elif set(['Date', 'Product', 'ISIN', 'Quantity', 'Price', 'Local value', 'Transaction and/or third']).issubset(df.columns):
+        # Transactions CSV
+        df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y', errors='coerce')
+        df = df.dropna(subset=['Date'])
+        df['Local value'] = pd.to_numeric(df['Local value'], errors='coerce')
+        df['Transaction and/or third'] = pd.to_numeric(df['Transaction and/or third'], errors='coerce').fillna(0)
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+        df = df.sort_values(['Date', 'Time'])
+        
+        holdings = {}
+        for _, row in df.iterrows():
+            if pd.isna(row['ISIN']): continue
+            isin = row['ISIN']
+            if isin not in holdings:
+                holdings[isin] = {'shares': 0.0, 'total_cost': 0.0, 'product': row['Product']}
+            quantity = row['Quantity']
+            local_value = row['Local value']
+            fees = row['Transaction and/or third']
+            if quantity > 0:  # buy
+                cost = -local_value - fees
+                holdings[isin]['total_cost'] += cost
+                holdings[isin]['shares'] += quantity
+            elif quantity < 0:  # sell
+                if holdings[isin]['shares'] > 0:
+                    avg_cost = holdings[isin]['total_cost'] / holdings[isin]['shares']
+                    cost_reduction = avg_cost * (-quantity)
+                    holdings[isin]['total_cost'] -= cost_reduction
+                holdings[isin]['shares'] += quantity
+            if abs(holdings[isin]['shares']) < 1e-6:
+                holdings[isin]['shares'] = 0.0
+                holdings[isin]['total_cost'] = 0.0
+        
+        df_holdings = pd.DataFrame(
+            [{'ISIN': k, 'Ticker': ISIN_TO_TICKER.get(k), 'Shares': v['shares'], 'Cost Basis': v['total_cost'], 'Product': v['product']}
+             for k, v in holdings.items() if v['shares'] > 0]
+        )
+        st.header('Computed Portfolio Holdings from Transactions')
+        st.dataframe(df_holdings)
+        
+        valid_holdings = df_holdings[df_holdings['Ticker'].notna()]
+        all_tickers = valid_holdings['Ticker'].tolist()
+        if all_tickers:
+            try:
+                current_prices = yf.download(all_tickers, period='1d')['Close'].iloc[-1]
+                df_holdings['Current Price'] = df_holdings['Ticker'].map(current_prices)
+                df_holdings['Current Value'] = df_holdings['Shares'] * df_holdings['Current Price']
+                total_value = df_holdings['Current Value'].sum()
+                df_holdings['Weight'] = df_holdings['Current Value'] / total_value
+                df_holdings['Unrealized Gain'] = df_holdings['Current Value'] - df_holdings['Cost Basis']
+                st.dataframe(df_holdings)
+                weights = df_holdings['Weight'].values
+                initial_investment = total_value
+                base_invested = df_holdings['Cost Basis'].sum()
+            except Exception as e:
+                st.error(f"Error fetching current prices: {e}")
+        else:
+            st.error("No valid tickers found for holdings.")
+    else:
+        st.error("CSV must contain either columns: Ticker, Shares, Cost Basis or transaction columns: Date, Product, ISIN, Quantity, Price, Local value, Transaction and/or third")
+
+# Weights input (dynamic based on tickers) - only if not uploaded
+if uploaded_file is None:
+    st.sidebar.subheader('Portfolio Weights')
+    weights = []
+    cols = st.sidebar.columns(2)
+    for i, ticker in enumerate(all_tickers):
+        col = cols[i % 2]
+        weight = col.number_input(ticker, min_value=0.0, max_value=1.0, value=1.0/len(all_tickers), step=0.05)
+        weights.append(weight)
+
+    weights = np.array(weights)
+    total_weight = np.sum(weights)
+    if total_weight != 1.0:
+        weights = weights / total_weight
+        st.sidebar.warning(f'Weights normalized to sum to 1: {weights.round(2)}')
 
 horizon = st.sidebar.slider('Time Horizon (Years)', min_value=1, max_value=20, value=5)
 simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=1000, step=100)  # Reduced default for speed
-initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0, step=1000.0)  # Allow 0 for pure DCA
+initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0 if uploaded_file is None else initial_investment, step=1000.0, disabled=uploaded_file is not None)  # Allow 0 for pure DCA
 monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
 contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
 inflation_rate = st.sidebar.slider('Expected Annual Inflation Rate (%)', min_value=0.0, max_value=10.0, value=2.0, step=0.1) / 100
@@ -439,7 +547,7 @@ if st.sidebar.button('Run Simulation'):
 
         # Run simulation with inflation, DCA, fees, tax, rebalancing, stress
         results, sim_final_values = bootstrap_simulation(
-            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors
+            returns, weights, simulations, horizon, initial_investment, inflation_rate, monthly_contrib, contrib_frequency, transaction_fee, tax_rate, rebalance, rebalance_frequency, rebalance_threshold, shock_factors, base_invested
         )
         
         # Display simulation results
