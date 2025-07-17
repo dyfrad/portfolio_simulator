@@ -350,20 +350,22 @@ class SidebarInputs:
                 for k, v in holdings.items() if v['shares'] > 0
             ])
             
-            st.header('Computed Portfolio Holdings from Transactions')
-            st.dataframe(df_holdings)
-            
             valid_holdings = df_holdings[df_holdings['Ticker'].notna()]
             all_tickers = valid_holdings['Ticker'].tolist()
             
             if all_tickers:
+                # Fetch current prices and calculate live portfolio data
                 current_prices = yf.download(all_tickers, period='1d')['Close'].iloc[-1]
                 df_holdings['Current Price'] = df_holdings['Ticker'].map(current_prices)
                 df_holdings['Current Value'] = df_holdings['Shares'] * df_holdings['Current Price']
                 total_value = df_holdings['Current Value'].sum()
                 df_holdings['Weight'] = df_holdings['Current Value'] / total_value
                 df_holdings['Unrealized Gain'] = df_holdings['Current Value'] - df_holdings['Cost Basis']
-                st.dataframe(df_holdings)
+                df_holdings['Unrealized Gain %'] = (df_holdings['Unrealized Gain'] / df_holdings['Cost Basis'] * 100).round(2)
+                
+                # Display single comprehensive table
+                st.header('Portfolio Holdings from Transactions')
+                st.dataframe(df_holdings, use_container_width=True)
                 
                 weights = df_holdings['Weight'].values
                 initial_investment = total_value
