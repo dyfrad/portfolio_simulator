@@ -554,22 +554,22 @@ if uploaded_file is None:
         weights = weights / total_weight
         st.sidebar.warning(f'Weights normalized to sum to 1: {weights.round(2)}')
 
-horizon = st.sidebar.number_input('Time Horizon (1 - 10 Years):', min_value=1, max_value=10, value=5, step=1)
-simulations = st.sidebar.slider('Number of Simulations', min_value=100, max_value=10000, value=1000, step=100)  # Reduced default for speed
+horizon = st.sidebar.number_input('Time Horizon (1 - 10 Years, in steps of 0.25 year):', min_value=1.0, max_value=10.0, value=5.0, step=0.25)
+simulations = st.sidebar.number_input('Number of Simulations (100 - 10000, in steps of 100)', min_value=100, max_value=10000, value=1000, step=100)
 initial_investment = st.sidebar.number_input('Initial Investment (€)', min_value=0.0, value=100000.0 if uploaded_file is None else initial_investment, step=1000.0, disabled=uploaded_file is not None)  # Allow 0 for pure DCA
 monthly_contrib = st.sidebar.number_input('Monthly Contribution (€)', min_value=0.0, value=0.0, step=100.0)
 contrib_frequency = st.sidebar.selectbox('Contribution Frequency', ['monthly', 'quarterly'])
-inflation_rate = st.sidebar.slider('Expected Annual Inflation Rate (%)', min_value=0.0, max_value=10.0, value=2.0, step=0.1) / 100
+inflation_rate = st.sidebar.number_input('Expected Annual Inflation Rate (0 - 20 %, in steps of 0.1%)', min_value=0.0, max_value=20.0, value=2.0, step=0.1) / 100
 
 # New inputs for fees and taxes
-ter = st.sidebar.slider('Annual TER (%)', min_value=0.0, max_value=1.0, value=0.2, step=0.05)
+ter = st.sidebar.number_input('Annual TER (0 - 2 %, in steps of 0.01%)', min_value=0.0, max_value=2.0, value=0.2, step=0.01)
 transaction_fee = st.sidebar.number_input('Transaction Fee per Buy (€)', min_value=0.0, value=5.0, step=1.0)
-tax_rate = st.sidebar.slider('Capital Gains Tax Rate (%)', min_value=0.0, max_value=50.0, value=25.0, step=1.0) / 100
+tax_rate = st.sidebar.number_input('Capital Gains Tax Rate (0 - 50 %, in steps of 0.1%)', min_value=0.0, max_value=50.0, value=25.0, step=0.1) / 100
 
 # New inputs for rebalancing
 rebalance = st.sidebar.checkbox('Enable Rebalancing')
 rebalance_frequency = st.sidebar.selectbox('Rebalancing Frequency', ['annual', 'quarterly'])
-rebalance_threshold = st.sidebar.slider('Rebalancing Threshold (%)', min_value=0.0, max_value=20.0, value=5.0, step=0.5) / 100
+rebalance_threshold = st.sidebar.number_input('Rebalancing Threshold (0 - 20 %, in steps of 0.5%)', min_value=0.0, max_value=20.0, value=5.0, step=0.5) / 100
 
 # New input for stress scenarios
 stress_scenario = st.sidebar.selectbox('Stress Scenario', ['None', '2008 Recession', 'COVID Crash', '2022 Bear Market', 'Inflation Spike'])
