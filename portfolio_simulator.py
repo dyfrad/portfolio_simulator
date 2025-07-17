@@ -323,25 +323,3 @@ def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
     result = minimize(objective, initial_guess, bounds=bounds, constraints=constraints)
     return result.x if result.success else None
 
-# Explanations for tooltips
-explanations = {
-    'Historical Annual Return': "The average annual return based on historical data.",
-    'Historical Annual Volatility': "The standard deviation of annual returns, measuring risk.",
-    'Historical Sharpe Ratio': "Risk-adjusted return: (return - risk-free rate) / volatility.",
-    'Historical Sortino Ratio': "Similar to Sharpe but only considers downside volatility.",
-    'Historical Max Drawdown': "The largest peak-to-trough decline in portfolio value.",
-    'Mean Final Value (Inflation-Adjusted, DCA)': "Average ending value after simulations, adjusted for inflation, using Dollar-Cost Averaging.",
-    'Median Final Value (Inflation-Adjusted, DCA)': "Median ending value after simulations, adjusted for inflation, using DCA.",
-    'Mean Final Value (Lump-Sum)': "Average ending value if invested all at once, for comparison.",
-    'Std Dev of Final Values (DCA)': "Variability in the simulated ending values.",
-    '95% VaR (Absolute Loss, DCA)': "There is a 5% chance of losing more than this amount over the horizon.",
-    '95% CVaR (Absolute Loss, DCA)': "The average loss in the worst 5% of scenarios.",
-    'Effective Cost Drag (%)': "The percentage reduction in returns due to fees and taxes.",
-    'Total Historical Return (DCA)': "Total return from backtest using Dollar-Cost Averaging.",
-    'Total Historical Return (Lump-Sum)': "Total return from backtest if invested all at once.",
-    'Annualized Return': "Average annual return from historical backtest.",
-    'Annualized Volatility': "Annualized standard deviation of returns from backtest.",
-    'Sharpe Ratio': "Risk-adjusted return from backtest.",
-    'Sortino Ratio': "Downside risk-adjusted return from backtest.",
-    'Max Drawdown': "Largest decline in backtest."
-}
