@@ -165,15 +165,129 @@ Functions like `plot_results`, `plot_historical_performance`, `plot_drawdowns`, 
 
 ## Backtesting
 
-### Concept
-Backtesting applies strategy to historical data for out-of-sample validation, avoiding lookahead bias. Includes DCA, rebalancing, fees/taxes.
+### Financial Concept: Backtesting
+Backtesting evaluates an investment strategy by applying it to historical data, simulating how it would have performed in the past. This helps validate strategy viability, identify weaknesses, and estimate risk-adjusted returns without lookahead bias. In portfolio contexts, it incorporates asset allocation, rebalancing, contributions (DCA), fees, taxes, and comparisons to benchmarks. Advanced techniques include sensitivity analysis (varying parameters), walk-forward optimization (in-sample training, out-of-sample testing), and incorporation of transaction costs for realism.
 
-Math: Similar to simulation but deterministic: \( V_T = V_0 (1 + R_{hist}) + \sum C_k (1 + R_{k:T}) \), net of costs.
+Key limitations: Overfitting (curve-fitting to history), survivorship bias (excluding delisted assets), and regime shifts (changing market conditions). To mitigate, use out-of-sample data and robust statistics.
 
-Reference: "Evaluating Trading Strategies" by Campbell R. Harvey.
+Mathematical Detail:
+- Portfolio Value Evolution (Lump-Sum): \( V_t = V_{t-1} (1 + \sum w_i r_{i,t}) \), net of fees/taxes at end.
+- DCA: Add contributions periodically, e.g., monthly: \( V_t = (V_{t-1} + C - f) (1 + \sum w_i r_{i,t}) \), where \( C \) is contribution, \( f \) transaction fee.
+- Rebalancing: At intervals, if \( \max |w_{current} - w_{target}| > \theta \), reset weights, simulating buys/sells (ignoring slippage for simplicity).
+- Taxes: Applied on realized gains at end: \( G = V_T - Inv \), net \( V_T^{net} = Inv + G (1 - \tau) \) if \( G > 0 \).
+- Advanced Metrics:
+  - Total Return: \( TR = \frac{V_T - Inv}{Inv} \).
+  - Annualized Return: As above.
+  - Calmar Ratio: \( Calmar = \frac{R_a}{|MDD|} \), measures return per unit of drawdown risk.
+  - Beta (\( \beta \)): Systematic risk vs benchmark: \( \beta = \frac{Cov(r_p, r_b)}{Var(r_b)} \), via linear regression.
+  - Alpha (\( \alpha \)): Excess return: From CAPM, \( r_p - r_f = \alpha + \beta (r_b - r_f) + \epsilon \); solve for \( \alpha \).
+  - Information Ratio: \( IR = \frac{R_a - R_{b,a}}{TE} \), where \( TE = \sigma(r_p - r_b) \) (tracking error).
+  - Exposure: \( Exp = \frac{\sum t_{invested}}{T} \times 100\% \), % time with positions (typically 100% for buy-and-hold portfolios).
+  - Standard Deviation of Losses: \( \sigma_{loss} = \sqrt{\frac{\sum (r_t < 0) (r_t - \bar{r}_{loss})^2}{n_{loss}}} \sqrt{252} \).
 
-### Code
-`backtest_portfolio` iterates over historical returns, applying contributions/rebalancing/taxes.
+References: "Evaluating Trading Strategies" by Campbell R. Harvey; "Portfolio Selection" by Harry Markowitz; TrendSpider Learning Center for advanced metrics like Beta, Exposure, and Calmar; Portfolio Visualizer documentation for practical backtesting tools.
+
+### Code Implementation
+The `backtest_portfolio` function has been enhanced to include advanced metrics (Calmar, Beta, Alpha, Information Ratio, Exposure) and returns time series for portfolio values (equity curves) for both lump-sum and DCA. A benchmark ticker (e.g., 'IWDA.AS' for MSCI World) is now optional input for relative metrics. Exposure is computed as the percentage of days with positive portfolio value (assuming always invested unless zero).
+
+Updated code (abridged):
+```python
+def backtest_portfolio(data, weights, initial_investment, monthly_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, benchmark_ticker=None):
+    returns = calculate_returns(data)
+    num_assets = len(weights)
+    values = initial_investment * weights
+    total_value = initial_investment
+    total_invested = initial_investment
+    rebalance_days = 252 if rebalance_frequency == 'annual' else 63
+    day_count = 0
+    port_value_series = pd.Series(index=returns.index, dtype=float)  # For lump-sum equity curve
+    dca_value_series = pd.Series(index=returns.index, dtype=float) if monthly_contrib > 0 else None
+    
+    for idx, (_, daily_returns) in enumerate(returns.iterrows()):
+        values *= (1 + daily_returns)
+        total_value = np.sum(values)
+        port_value_series.iloc[idx] = total_value
+        current_weights = values / total_value if total_value > 0 else weights
+        if rebalance and (day_count % rebalance_days == 0):
+            max_drift = np.max(np.abs(current_weights - weights))
+            if max_drift > rebalance_threshold:
+                values = total_value * weights  # Rebalance
+        day_count += 1
+    
+    # ... (original total return calculations for lump-sum and DCA)
+    
+    # Advanced metrics
+    ann_return, ann_vol, sharpe, sortino, max_dd = portfolio_stats(weights, returns)
+    calmar = ann_return / -max_dd if max_dd < 0 else 0
+    
+    # Benchmark metrics if provided
+    beta, alpha, info_ratio = None, None, None
+    exposure = (port_value_series > 0).mean() * 100  # % days invested
+    if benchmark_ticker:
+        bench_data = fetch_data(benchmark_ticker, data.index[0], data.index[-1])
+        bench_returns = calculate_returns(bench_data)
+        if benchmark_ticker in bench_returns.columns:
+            bench_ret = bench_returns[benchmark_ticker]
+            port_ret = np.dot(returns, weights)
+            cov = np.cov(port_ret, bench_ret)[0,1]
+            var_b = np.var(bench_ret)
+            beta = cov / var_b if var_b != 0 else 0
+            ann_bench = bench_ret.mean() * 252
+            alpha = ann_return - (rf_rate + beta * (ann_bench - rf_rate))
+            tracking_error = np.std(port_ret - bench_ret) * np.sqrt(252)
+            info_ratio = (ann_return - ann_bench) / tracking_error if tracking_error != 0 else 0
+    
+    # For DCA equity curve (resampled for efficiency)
+    if monthly_contrib > 0:
+        freq = 'M' if contrib_frequency == 'monthly' else 'Q'
+        monthly_data = data.resample(freq).last()
+        monthly_returns = monthly_data.pct_change().dropna()
+        port_monthly_returns = np.dot(monthly_returns, weights)
+        value = 0.0
+        total_invested = 0.0
+        dca_idx = 0
+        for ret in port_monthly_returns:
+            effective_contrib = monthly_contrib - transaction_fee
+            value = (value + effective_contrib) * (1 + ret)
+            total_invested += monthly_contrib
+            # Map back to daily index (approximate)
+            dca_value_series.iloc[dca_idx:dca_idx + 21] = value  # Fill forward approx
+            dca_idx += 21  # Avg days per month
+        # ... (tax adjustment)
+    
+    return {
+        'Total Return (DCA)': cum_port_returns_dca,
+        'Total Return (Lump-Sum)': net_cum_port_returns,
+        'Annualized Return': ann_return,
+        'Annualized Volatility': ann_vol,
+        'Sharpe Ratio': sharpe,
+        'Sortino Ratio': sortino,
+        'Max Drawdown': max_dd,
+        'Calmar Ratio': calmar,
+        'Beta': beta,
+        'Alpha': alpha,
+        'Information Ratio': info_ratio,
+        'Exposure (%)': exposure,
+    }, port_value_series, dca_value_series
+```
+- **Logic**: Iterates daily for lump-sum, tracking value series. For DCA, resamples to contribution frequency and approximates daily series by filling forward. Computes advanced metrics using covariance for beta, CAPM for alpha, tracking error for IR. Exposure assumes always invested if value >0.
+- **Edge Cases**: No benchmark skips relative metrics. Zero max_dd avoids division by zero. Short data may inflate annualized stats; warn if <252 days.
+- **Enhancements for Details**: Returns equity curves for plotting (e.g., via Plotly line chart). In dashboard, add benchmark input, display new metrics with tooltips, and plot equity curves (lump-sum vs DCA vs benchmark).
+
+To visualize backtest:
+```python
+def plot_backtest_performance(port_value_series, dca_value_series, bench_data=None):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=port_value_series.index, y=port_value_series, mode='lines', name='Lump-Sum Portfolio'))
+    if dca_value_series is not None:
+        fig.add_trace(go.Scatter(x=dca_value_series.index, y=dca_value_series, mode='lines', name='DCA Portfolio'))
+    if bench_data is not None:
+        bench_cum = (1 + calculate_returns(bench_data)).cumprod() * initial_investment
+        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.iloc[:,0], mode='lines', name='Benchmark'))
+    fig.update_layout(title='Backtest Equity Curves', xaxis_title='Date', yaxis_title='Portfolio Value')
+    return fig
+```
+- **Integration**: In dashboard, after running, fetch benchmark if selected, compute, plot, and update report.
 
 ## Portfolio Optimization
 
@@ -187,17 +301,17 @@ Uses `scipy.optimize.minimize` with SLSQP solver implicitly.
 
 ## PDF Report Generation
 
-Uses Reportlab to canvas text and images from figures. Logic: Draw metrics, embed PNGs from Plotly/Matplotlib.
+Uses Reportlab to canvas text and images from figures. Logic: Draw metrics, embed PNGs from Plotly/Matplotlib. Enhanced to include backtest plot and new metrics.
 
 ## User Interface and Session State
 
-Streamlit sidebar for inputs, columns for metrics with tooltips (explanations dict). Session state persists results post-simulation. Uploads handle CSVs for real portfolios, mapping ISIN to tickers.
+Streamlit sidebar for inputs, columns for metrics with tooltips (explanations dict). Session state persists results post-simulation. Uploads handle CSVs for real portfolios, mapping ISIN to tickers. Add sidebar input for benchmark_ticker (default 'IWDA.AS').
 
 ## Limitations and Scrutiny Points
-- Assumptions: Stationary returns (questionable in regime shifts); no slippage in rebalancing; simplified tax (flat on gains at end).
-- Financial Correctness: Bootstrap may underestimate tail risks; stress scenarios are stylized.
-- Programming: Potential overflows in large simulations; reliance on Yahoo data accuracy.
-- Extensions: Incorporate correlations explicitly or machine learning for return predictions.
+- Assumptions: Stationary returns (questionable in regime shifts); no slippage in rebalancing; simplified tax (flat on gains at end); always 100% exposure unless zero value.
+- Financial Correctness: Backtesting may overfit; bootstrap underestimates tails; add out-of-sample for robustness.
+- Programming: Potential overflows in large datasets; reliance on Yahoo data accuracy; approximate DCA series filling.
+- Extensions: Walk-forward backtesting, sensitivity to parameters, machine learning for predictions.
 
 ## References
 - Fama, E. F. (1970). Efficient Capital Markets: A Review of Theory and Empirical Work. Journal of Finance.
@@ -205,5 +319,6 @@ Streamlit sidebar for inputs, columns for metrics with tooltips (explanations di
 - Sortino, F. A., & van der Meer, R. (1991). Downside Risk. Journal of Portfolio Management.
 - Efron, B. (1979). Bootstrap Methods: Another Look at the Jackknife. Annals of Statistics.
 - Markowitz, H. (1952). Portfolio Selection. Journal of Finance.
-- Websites: Investopedia (for metrics), Yahoo Finance API docs.
+- Harvey, C. R. (2014). Evaluating Trading Strategies. Journal of Portfolio Management.
+- Websites: Investopedia (metrics), Yahoo Finance API docs, TrendSpider Learning Center (advanced metrics), Portfolio Visualizer (backtesting tools).
 - Books: "Quantitative Investment Analysis" by DeFusco et al. (CFA Institute).
