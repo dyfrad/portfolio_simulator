@@ -205,3 +205,24 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Portfolio Simulator Backend API
+portfolio-simulator-api/portfolio.db
+portfolio-simulator-api/portfolio.db-journal
+portfolio-simulator-api/alembic/versions/*.py
+portfolio-simulator-api/.env
+portfolio-simulator-api/test_*.py
+portfolio-simulator-api/BACKEND_TEST_REPORT.md
+
+# Portfolio Simulator Frontend
+portfolio-simulator-web/node_modules/
+portfolio-simulator-web/.next/
+portfolio-simulator-web/out/
+portfolio-simulator-web/.env
+portfolio-simulator-web/.env.local
+portfolio-simulator-web/.env.development.local
+portfolio-simulator-web/.env.test.local
+portfolio-simulator-web/.env.production.local
+portfolio-simulator-web/package-lock.json
+portfolio-simulator-web/yarn.lock
+portfolio-simulator-web/pnpm-lock.yaml
