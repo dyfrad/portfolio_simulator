@@ -31,8 +31,6 @@ dependencies = [
     "matplotlib",
     "scipy",
     "plotly",
-    "reportlab",
-    "kaleido",
 ]
 
 [project.urls]

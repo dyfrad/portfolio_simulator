@@ -19,8 +19,6 @@ The application relies on the following Python libraries:
 - `streamlit`: For building the interactive web dashboard.
 - `scipy`: For optimization (e.g., minimizing negative Sharpe ratio).
 - `plotly`: For interactive visualizations (e.g., line charts, pie charts).
-- `reportlab`: For generating PDF reports.
-- `kaleido`: For exporting Plotly figures to static images in PDFs.
 
 These are listed in a `requirements.txt` file for deployment. No additional installations are needed beyond these, as the code interpreter environment includes them.
 
