@@ -121,7 +121,7 @@ class PortfolioListResponse(BaseModel):
     updated_at: Optional[datetime]
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PortfolioResponse(PortfolioBase):
@@ -132,7 +132,7 @@ class PortfolioResponse(PortfolioBase):
     updated_at: Optional[datetime]
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PortfolioOptimizationResponse(BaseModel):
