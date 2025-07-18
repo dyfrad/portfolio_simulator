@@ -3,10 +3,8 @@ Results display components for portfolio simulator.
 """
 
 import streamlit as st
-import io
 import pandas as pd
 from typing import Dict, Any
-from reports import PDFReportGenerator, ReportFactory
 
 
 class ResultsDisplay:
@@ -38,9 +36,6 @@ class ResultsDisplay:
         
         # Backtesting results
         self._render_backtest_results(session_data['backtest_results'])
-        
-        # PDF and CSV download buttons
-        self._render_download_buttons(session_data)
     
     def _render_simulation_metrics(self, results: Dict[str, float]):
         """Render simulation results metrics."""
@@ -166,49 +161,6 @@ class ResultsDisplay:
                 f"{backtest_results['Max Drawdown']:.2%}"
             )
     
-    def _render_download_buttons(self, session_data: Dict[str, Any]):
-        """Render PDF and CSV download buttons."""
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            self._render_pdf_download_button(session_data)
-        
-        with col2:
-            self._render_csv_download_button(session_data['results'])
-    
-    def _render_pdf_download_button(self, session_data: Dict[str, Any]):
-        """Render PDF report download button."""
-        if st.button('Generate PDF Report'):
-            # Create charts dictionary
-            charts = ReportFactory.create_charts_dict(
-                fig_pie_original=session_data['fig_pie_original'],
-                fig_pie_optimized=session_data.get('fig_pie_optimized'),
-                fig_hist=session_data['fig_hist'],
-                fig_dd=session_data['fig_dd'],
-                fig_drift=session_data['fig_drift'],
-                fig_dist=session_data['fig_dist']
-            )
-            
-            # Create report data
-            report_data = ReportFactory.create_simulation_report(
-                tickers=session_data['all_tickers'],
-                weights=session_data['weights'],
-                simulation_results=session_data['results'],
-                backtest_results=session_data['backtest_results'],
-                charts=charts,
-                horizon_years=session_data['horizon']
-            )
-            
-            # Generate PDF
-            pdf_generator = PDFReportGenerator()
-            pdf_buffer = pdf_generator.generate(report_data)
-            
-            st.download_button(
-                label="Download PDF Report",
-                data=pdf_buffer,
-                file_name="portfolio_report.pdf",
-                mime="application/pdf"
-            )
     
     def _render_optimized_allocation(self, session_data: Dict[str, Any]):
         """Render optimized portfolio allocation section."""
@@ -232,15 +184,4 @@ class ResultsDisplay:
                 
                 st.subheader('Optimized Weights')
                 st.dataframe(weights_df, use_container_width=True)
-    
-    def _render_csv_download_button(self, results: Dict[str, float]):
-        """Render CSV download button."""
-        csv_buffer = io.StringIO()
-        pd.DataFrame([results]).to_csv(csv_buffer, index=False)
-        
-        st.download_button(
-            label="Download Simulation Results as CSV",
-            data=csv_buffer.getvalue(),
-            file_name="portfolio_simulation_results.csv",
-            mime="text/csv"
-        ) 
+ 
