@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios. It allows interactive adjustments to portfolio weights, simulation parameters, and visualizations of results. The application supports features like inflation adjustment, Dollar-Cost Averaging (DCA), custom assets, backtesting, fees/taxes, rebalancing, stress scenarios, and report generation. Key use cases include setting custom tickers for flexibility and uploading CSV files tuned for Degiro transaction history to automatically compute current holdings, cost basis, and portfolio weights.
+This is a personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios. It allows interactive adjustments to portfolio weights, simulation parameters, and visualizations of results. The application supports features like inflation adjustment, Dollar-Cost Averaging (DCA), custom assets, backtesting, fees/taxes, rebalancing, and stress scenarios. Key use cases include setting custom tickers for flexibility and uploading CSV files tuned for Degiro transaction history to automatically compute current holdings, cost basis, and portfolio weights.
 
 Originally cloned from the private repository at `github.com/dyfrad/portfolio_simulator` for personal use. This project is not intended for open-source distribution or public sharing. All modifications and usage are for private financial planning purposes only.
 
@@ -22,11 +22,6 @@ portfolio_simulator/
 │       ├── results_display.py      # Results visualization
 │       ├── sidebar_inputs.py       # Input controls
 │       └── state_manager.py        # State management
-├── reports/                        # Report generation
-│   ├── __init__.py
-│   ├── data_models.py              # Data structures for reports
-│   ├── factory.py                  # Report factory pattern
-│   └── pdf_generator.py            # PDF generation logic
 ├── requirements.txt                # Python dependencies
 ├── Dockerfile                      # Container configuration
 └── README.md                       # This file
@@ -46,7 +41,6 @@ portfolio_simulator/
 - **Stress Scenarios**: Predefined tests like 2008 Recession or COVID Crash.
 - **Portfolio Upload**: Upload CSV for holdings (Ticker, Shares, Cost Basis) or transaction history (tuned for Degiro transactions) to compute current value and weights.
 - **Educational Tooltips**: Help explanations for metrics.
-- **Report Generation**: Download PDF reports with metrics and charts.
 
 ## Installation
 
@@ -77,8 +71,6 @@ pandas
 matplotlib
 scipy
 plotly
-reportlab
-kaleido
 ```
 
 ## Running the Application
@@ -128,11 +120,7 @@ This setup ensures all dependencies are contained and the app runs consistently 
 3. **Backtesting**:
    - Automatically runs with simulation; shows historical returns, volatility, etc.
 
-4. **Reports**:
-   - Generate and download a PDF report with key metrics and visualizations.
-   - Download simulation results as CSV.
-
-5. **Customization**:
+4. **Customization**:
    - Add custom tickers in the sidebar (comma-separated).
    - Modify default tickers or ISIN mappings in the code if needed.
    - Extend features by editing functions (e.g., add new stress scenarios).
@@ -151,12 +139,10 @@ The codebase follows a modular architecture:
 - **Core Logic**: `portfolio_simulator.py` contains the main simulation engine and financial calculations
 - **UI Layer**: `portfolio_simulator_ui.py` serves as the entry point, importing from the `ui` module
 - **Components**: Reusable UI components are organized in `ui/components/`
-- **Reports**: PDF report generation logic is in the `reports/` module
 
 To extend functionality:
 - Add new UI components in `ui/components/`
 - Modify simulation logic in `portfolio_simulator.py`
-- Update report templates in `reports/`
 - Configure defaults in `portfolio_simulator_ui.py`
 
 ## Troubleshooting
@@ -164,10 +150,9 @@ To extend functionality:
 - **Data Fetch Errors**: Ensure tickers are valid and Yahoo Finance is accessible. If data is limited (<252 days), a warning appears.
 - **yfinance Issues**: As an unofficial wrapper for Yahoo Finance API, it may break if Yahoo changes their endpoints. Update to the latest version with `pip install yfinance --upgrade` or visit the GitHub repo for issues: https://github.com/ranaroussi/yfinance.
 - **Optimization Failure**: Falls back to equal weights if Sharpe optimization fails.
-- **PDF Generation**: Requires images to be exportable; ensure Kaleido is installed correctly.
 - **Performance**: High simulation counts (e.g., 10,000) may take time; reduce for quicker runs.
 - **Docker Issues**: Ensure Docker is running and ports are free. If building fails, check for missing files or network issues during pip install.
-- **Import Errors**: If you encounter module import issues, ensure all `__init__.py` files are present in the `ui/` and `reports/` directories.
+- **Import Errors**: If you encounter module import issues, ensure all `__init__.py` files are present in the `ui/` directory.
 
 ## Notes for Personal Use
 
