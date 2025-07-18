@@ -71,8 +71,11 @@ class PortfolioDashboard:
             # Import business logic functions (kept in original file for now)
             from portfolio_simulator import (
                 fetch_data, calculate_returns, bootstrap_simulation, 
-                backtest_portfolio, plot_results, plot_historical_performance,
-                plot_drawdowns, plot_weight_drift, optimize_weights
+                backtest_portfolio, optimize_weights
+            )
+            from modules.visualization import (
+                plot_results, plot_historical_performance,
+                plot_drawdowns, plot_weight_drift
             )
             import plotly.express as px
             
