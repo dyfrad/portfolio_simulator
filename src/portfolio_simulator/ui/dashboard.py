@@ -68,7 +68,7 @@ class PortfolioDashboard:
     def _execute_simulation(self, config: SimulationConfig):
         """Execute portfolio simulation with given configuration."""
         try:
-            # Import business logic functions (kept in original file for now)
+            # Import business logic functions
             from portfolio_simulator import (
                 fetch_data, calculate_returns, bootstrap_simulation, 
                 backtest_portfolio, optimize_weights

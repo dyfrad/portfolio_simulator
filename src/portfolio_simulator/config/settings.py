@@ -1,6 +1,5 @@
 """
 Settings management for portfolio simulator.
-Just organizes existing configuration values, no new features.
 """
 
 import os
@@ -38,26 +37,26 @@ class Settings:
         self.debug = env_config.get("debug", os.getenv("DEBUG", "False").lower() == "true")
         self.cache_enabled = env_config.get("cache_enabled", True)
         
-        # Data settings (existing values)
+        # Data settings
         self.default_tickers = DEFAULT_TICKERS
         self.default_start_date = DEFAULT_START_DATE
         
-        # Simulation defaults (matching actual UI defaults)
+        # Simulation defaults
         self.default_num_simulations = env_config.get("num_simulations", 1000)
-        self.default_time_horizon_years = 5.0  # matches UI default
-        self.default_initial_investment = 100000.0  # matches UI calculated value
-        self.default_periodic_contrib = 0.0  # matches UI default
-        self.default_contrib_frequency = 'monthly'  # existing: monthly, quarterly
-        self.default_inflation_rate = 2.0  # matches UI default
-        self.default_transaction_fee = 0.2  # matches UI default
-        self.default_tax_rate = 25.0  # matches UI default
+        self.default_time_horizon_years = 5.0
+        self.default_initial_investment = 100000.0
+        self.default_periodic_contrib = 0.0
+        self.default_contrib_frequency = 'monthly'
+        self.default_inflation_rate = 2.0
+        self.default_transaction_fee = 0.2
+        self.default_tax_rate = 25.0
         
-        # Rebalancing defaults (existing values)
+        # Rebalancing defaults
         self.default_rebalance = True
-        self.default_rebalance_frequency = 'quarterly'  # existing: quarterly, annual
+        self.default_rebalance_frequency = 'quarterly'
         self.default_rebalance_threshold = 0.05
         
-        # Risk calculation defaults (existing values)
+        # Risk calculation defaults
         self.default_confidence_level = 0.95
         self.default_risk_free_rate = 0.02
         self.trading_days_per_year = 252
