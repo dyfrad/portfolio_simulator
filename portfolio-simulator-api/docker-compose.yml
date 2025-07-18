@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # FastAPI Application
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://portfolio_user:portfolio_pass@db:5432/portfolio_db
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+      - DEBUG=true
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+      - /tmp/reports:/tmp/reports
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=portfolio_db
+      - POSTGRES_USER=portfolio_user
+      - POSTGRES_PASSWORD=portfolio_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio_user -d portfolio_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and Celery
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery Worker for background tasks
+  worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://portfolio_user:portfolio_pass@db:5432/portfolio_db
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+      - /tmp/reports:/tmp/reports
+    command: celery -A app.services.background_jobs worker --loglevel=info
+
+  # Optional: Celery Flower for monitoring
+  flower:
+    build: .
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    command: celery -A app.services.background_jobs flower --port=5555
+
+volumes:
+  postgres_data:
+  redis_data: 
