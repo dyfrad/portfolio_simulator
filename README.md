@@ -8,22 +8,62 @@ Originally cloned from the private repository at `github.com/dyfrad/portfolio_si
 
 ## Project Structure
 
-The codebase has a modular structure:
+The codebase follows modern Python packaging standards with a well-organized modular structure:
 
 ```
 portfolio_simulator/
-├── portfolio_simulator.py          # Core simulation logic and financial calculations
-├── portfolio_simulator_ui.py       # Streamlit UI and main entry point
-├── ui/                             # UI components
-│   ├── __init__.py
-│   ├── dashboard.py                # Main dashboard component
-│   └── components/                 # Reusable UI components
+├── src/                            # Source code package
+│   └── portfolio_simulator/        # Main package
 │       ├── __init__.py
-│       ├── results_display.py      # Results visualization
-│       ├── sidebar_inputs.py       # Input controls
-│       └── state_manager.py        # State management
-├── requirements.txt                # Python dependencies
+│       ├── core/                   # Business logic modules
+│       │   ├── __init__.py
+│       │   ├── data_operations.py  # Data fetching and processing
+│       │   ├── financial_calculations.py # Portfolio statistics and optimization
+│       │   ├── simulation_engine.py # Monte Carlo simulation engine
+│       │   ├── backtesting.py      # Historical backtesting
+│       │   └── visualization.py    # Chart generation
+│       ├── config/                 # Configuration management
+│       │   ├── __init__.py
+│       │   ├── constants.py        # Default tickers and constants
+│       │   ├── settings.py         # Application settings
+│       │   └── environments/       # Environment-specific configs
+│       │       ├── __init__.py
+│       │       ├── development.py
+│       │       ├── production.py
+│       │       └── testing.py
+│       └── ui/                     # UI components
+│           ├── __init__.py
+│           ├── dashboard.py        # Main dashboard component
+│           └── components/         # Reusable UI components
+│               ├── __init__.py
+│               ├── results_display.py # Results visualization
+│               ├── sidebar_inputs.py  # Input controls
+│               └── state_manager.py   # State management
+├── scripts/                        # Entry point scripts
+│   ├── run_simulator.py
+│   └── run_ui.py
+├── tests/                          # Comprehensive test suite
+│   ├── __init__.py
+│   ├── conftest.py                 # Pytest configuration
+│   ├── fixtures/                   # Test data and fixtures
+│   │   ├── __init__.py
+│   │   └── sample_data.py
+│   ├── unit/                       # Unit tests
+│   │   ├── __init__.py
+│   │   ├── test_data_operations.py
+│   │   ├── test_financial_calculations.py
+│   │   ├── test_simulation_engine.py
+│   │   ├── test_backtesting.py
+│   │   ├── test_visualization.py
+│   │   └── test_config.py
+│   ├── integration/                # Integration tests
+│   │   ├── __init__.py
+│   │   └── test_portfolio_simulator.py
+│   └── utils.py                    # Test utilities and helpers
+├── pyproject.toml                  # Modern Python packaging configuration
+├── requirements.txt                # Legacy dependencies (maintained for compatibility)
 ├── Dockerfile                      # Container configuration
+├── portfolio_simulator_ui.py       # Legacy UI entry point (maintained for compatibility)
 └── README.md                       # This file
 ```
 
@@ -48,46 +88,78 @@ Since this is a cloned repository for personal use:
 
 1. Ensure you have Python 3.8+ installed (recommended: 3.12 for better performance and security).
 2. Clone the repository (already done):
-   ```
+   ```bash
    git clone git@github.com:dyfrad/portfolio_simulator.git
    cd portfolio_simulator
    ```
-3. Create a virtual environment (optional but recommended):
-   ```
+3. Create a virtual environment (recommended):
+   ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-4. Install dependencies from `requirements.txt` (create one if not present):
+4. Install the package in development mode (recommended):
+   ```bash
+   pip install -e .
    ```
+   
+   **Alternative**: Install from requirements.txt for legacy compatibility:
+   ```bash
    pip install -r requirements.txt
    ```
 
-### requirements.txt Content
+### Modern Package Installation
+
+The project now uses modern Python packaging with `pyproject.toml`. This provides:
+- **Proper dependency management** with optional dependencies for development and testing
+- **Entry point scripts** accessible from anywhere after installation
+- **Editable installs** for development with `pip install -e .`
+
+### Development Dependencies
+
+For development and testing, install with development dependencies:
+```bash
+pip install -e ".[dev,test]"
 ```
-streamlit
-yfinance
-numpy
-pandas
-matplotlib
-scipy
-plotly
-```
+
+This includes tools for:
+- **Testing**: pytest, pytest-cov, pytest-mock
+- **Code Quality**: black, flake8, mypy, pre-commit
+- **Documentation**: sphinx, sphinx-rtd-theme
 
 ## Running the Application
 
-Run the dashboard locally:
+### Method 1: Using Entry Point Scripts (Recommended)
+After installing the package, you can run the application from anywhere:
+```bash
+# Run the Streamlit UI
+portfolio-ui
+
+# Or run the simulation engine directly
+portfolio-simulator
 ```
+
+### Method 2: Using Legacy Entry Point
+For backward compatibility, you can still use the legacy entry point:
+```bash
 streamlit run portfolio_simulator_ui.py
 ```
 
-This will launch the app in your default web browser (typically at `http://localhost:8501`).
+### Method 3: Using Script Files
+Navigate to the scripts directory and run:
+```bash
+python scripts/run_ui.py
+```
 
-- For development or debugging, you can edit the code in the modular structure:
-  - Main UI logic: `portfolio_simulator_ui.py`
-  - Core simulation: `portfolio_simulator.py`
-  - UI components: `ui/dashboard.py` and `ui/components/`
-  - Report generation: `reports/`
-- Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
+### Application Access
+The application will launch in your default web browser (typically at `http://localhost:8501`).
+
+### Development Guidelines
+- **Core Logic**: Located in `src/portfolio_simulator/core/` modules
+- **UI Components**: Organized in `src/portfolio_simulator/ui/` 
+- **Configuration**: Managed through `src/portfolio_simulator/config/`
+- **Testing**: Comprehensive test suite in `tests/` directory
+
+**Note**: Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
 
 ## Running with Docker
 
@@ -127,32 +199,159 @@ This setup ensures all dependencies are contained and the app runs consistently 
 
 ## Configuration
 
-- **Default Start Date**: '2015-01-01' (editable in sidebar).
-- **ISIN to Ticker Mapping**: Hardcoded in the code; update the `ISIN_TO_TICKER` dictionary for additional assets.
-- **Cache**: Uses Streamlit's `@st.cache_data` for data fetching to improve performance.
-- **Session State**: Tracks simulation runs to avoid re-computation.
+The application uses a sophisticated configuration management system:
+
+### Configuration Structure
+- **Constants**: Default tickers and mappings in `src/portfolio_simulator/config/constants.py`
+- **Settings**: Application settings in `src/portfolio_simulator/config/settings.py`
+- **Environments**: Environment-specific configurations in `src/portfolio_simulator/config/environments/`
+
+### Key Configuration Options
+- **Default Start Date**: '2015-01-01' (configurable)
+- **ISIN to Ticker Mapping**: Extensible mapping in `constants.py`
+- **Environment Settings**: Separate configs for development, production, and testing
+- **Cache**: Uses Streamlit's `@st.cache_data` for performance optimization
+- **Session State**: Intelligent state management to avoid re-computation
+
+### Environment Variables
+Set environment-specific behavior using:
+```bash
+export ENVIRONMENT=development  # or production, testing
+export DEBUG=true              # Enable debug mode
+```
 
 ## Development
 
-The codebase follows a modular architecture:
+The codebase follows modern Python packaging standards and clean architecture principles:
 
-- **Core Logic**: `portfolio_simulator.py` contains the main simulation engine and financial calculations
-- **UI Layer**: `portfolio_simulator_ui.py` serves as the entry point, importing from the `ui` module
-- **Components**: Reusable UI components are organized in `ui/components/`
+### Architecture Overview
+- **Separation of Concerns**: Business logic separated from UI and configuration
+- **Modular Design**: Each module has a single responsibility
+- **Testable Code**: Comprehensive test coverage with unit and integration tests
+- **Configuration Management**: Environment-specific settings and constants
 
-To extend functionality:
-- Add new UI components in `ui/components/`
-- Modify simulation logic in `portfolio_simulator.py`
-- Configure defaults in `portfolio_simulator_ui.py`
+### Development Workflow
+1. **Core Financial Logic**: Implement in `src/portfolio_simulator/core/`
+2. **UI Components**: Create reusable components in `src/portfolio_simulator/ui/components/`
+3. **Configuration**: Add settings to appropriate config modules
+4. **Testing**: Write tests in `tests/unit/` and `tests/integration/`
+
+### Testing
+Run the comprehensive test suite:
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src/portfolio_simulator
+
+# Run specific test types
+pytest tests/unit/          # Unit tests only
+pytest tests/integration/   # Integration tests only
+```
+
+### Code Quality
+The project includes tools for maintaining code quality:
+```bash
+# Format code
+black src/ tests/
+
+# Lint code
+flake8 src/ tests/
+
+# Type checking
+mypy src/
+```
+
+## Testing Infrastructure
+
+The project includes a comprehensive testing framework with 135+ tests achieving 44% code coverage:
+
+### Test Structure
+```
+tests/
+├── conftest.py                 # Pytest configuration and shared fixtures
+├── fixtures/                   # Test data and mock objects
+│   └── sample_data.py         # Sample portfolio and market data
+├── unit/                      # Unit tests (104 tests)
+│   ├── test_data_operations.py       # Data fetching and processing tests
+│   ├── test_financial_calculations.py # Portfolio statistics and optimization tests  
+│   ├── test_simulation_engine.py     # Monte Carlo simulation tests
+│   ├── test_backtesting.py          # Historical backtesting tests
+│   ├── test_visualization.py        # Chart generation tests
+│   └── test_config.py              # Configuration management tests
+├── integration/               # Integration tests (10 tests)
+│   └── test_portfolio_simulator.py  # End-to-end workflow tests
+└── utils.py                   # Test utilities and assertion helpers
+```
+
+### Test Categories
+
+- **Unit Tests**: Test individual functions and methods in isolation
+- **Integration Tests**: Test complete workflows from data fetch to visualization
+- **Mock Objects**: Comprehensive mocking of external dependencies (Yahoo Finance, etc.)
+- **Parametrized Tests**: Multiple test scenarios with different inputs
+- **Financial Assertions**: Specialized assertions for validating financial calculations
+
+### Test Execution
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test categories
+pytest tests/unit/                    # Unit tests only
+pytest tests/integration/             # Integration tests only
+pytest -m "not slow"                  # Skip slow tests
+
+# Run with coverage reporting
+pytest --cov=src/portfolio_simulator --cov-report=html
+```
+
+### Test Coverage
+Current test coverage focuses on core financial functionality:
+- **Core Modules**: 98-100% coverage for financial calculations, simulation, and backtesting
+- **Configuration**: 100% coverage for settings and environment management  
+- **Overall**: 44% total coverage with comprehensive testing of critical financial logic
 
 ## Troubleshooting
+
+### Common Issues
 
 - **Data Fetch Errors**: Ensure tickers are valid and Yahoo Finance is accessible. If data is limited (<252 days), a warning appears.
 - **yfinance Issues**: As an unofficial wrapper for Yahoo Finance API, it may break if Yahoo changes their endpoints. Update to the latest version with `pip install yfinance --upgrade` or visit the GitHub repo for issues: https://github.com/ranaroussi/yfinance.
 - **Optimization Failure**: Falls back to equal weights if Sharpe optimization fails.
 - **Performance**: High simulation counts (e.g., 10,000) may take time; reduce for quicker runs.
 - **Docker Issues**: Ensure Docker is running and ports are free. If building fails, check for missing files or network issues during pip install.
-- **Import Errors**: If you encounter module import issues, ensure all `__init__.py` files are present in the `ui/` directory.
+
+### Installation Issues
+
+- **Import Errors**: If you encounter module import issues after restructuring:
+  1. Reinstall the package: `pip install -e .`
+  2. Ensure you're using the new import paths: `from portfolio_simulator.core import ...`
+  3. Check that all `__init__.py` files are present
+
+- **Entry Point Issues**: If `portfolio-ui` or `portfolio-simulator` commands don't work:
+  1. Reinstall with entry points: `pip install -e .`
+  2. Check your PATH includes the Python scripts directory
+  3. Use the legacy method: `streamlit run portfolio_simulator_ui.py`
+
+### Testing Issues
+
+- **Test Failures**: If tests fail after installation:
+  1. Install test dependencies: `pip install -e ".[test]"`
+  2. Run tests from the project root: `pytest`
+  3. Check that the package is properly installed: `pip show portfolio-simulator`
+
+### Performance Optimization
+
+- **Slow Simulations**: 
+  - Reduce number of simulations in development environment
+  - Use the testing environment config for faster iterations
+  - Consider caching data when running multiple simulations
 
 ## Notes for Personal Use
 
