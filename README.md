@@ -8,12 +8,12 @@ Originally cloned from the private repository at `github.com/dyfrad/portfolio_si
 
 ## Project Structure
 
-The codebase has been refactored into a modular structure:
+The codebase has a modular structure:
 
 ```
 portfolio_simulator/
-├── portfolio_simulator.py          # Core simulation logic
-├── portfolio_simulator_ui.py       # Main UI entry point
+├── portfolio_simulator.py          # Core simulation logic and financial calculations
+├── portfolio_simulator_ui.py       # Streamlit UI and main entry point
 ├── ui/                             # UI components
 │   ├── __init__.py
 │   ├── dashboard.py                # Main dashboard component
@@ -146,12 +146,12 @@ This setup ensures all dependencies are contained and the app runs consistently 
 
 ## Development
 
-The refactored codebase follows a modular architecture:
+The codebase follows a modular architecture:
 
-- **Core Logic**: `portfolio_simulator.py` contains the main simulation engine
+- **Core Logic**: `portfolio_simulator.py` contains the main simulation engine and financial calculations
 - **UI Layer**: `portfolio_simulator_ui.py` serves as the entry point, importing from the `ui` module
 - **Components**: Reusable UI components are organized in `ui/components/`
-- **Reports**: Report generation logic is separated into the `reports/` module
+- **Reports**: PDF report generation logic is in the `reports/` module
 
 To extend functionality:
 - Add new UI components in `ui/components/`
