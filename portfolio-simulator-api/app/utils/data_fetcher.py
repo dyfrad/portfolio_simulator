@@ -9,6 +9,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import json
+import random
 from app.core.config import settings
 
 
@@ -31,6 +32,7 @@ class DataFetcher:
         """Close the aiohttp session."""
         if self._session and not self._session.closed:
             await self._session.close()
+            self._session = None
     
     async def fetch_yahoo_finance_data(
         self,
@@ -50,17 +52,24 @@ class DataFetcher:
         
         session = await self._get_session()
         
-        # Fetch data for all tickers concurrently
-        tasks = []
+        # Fetch data for all tickers with rate limiting
+        results = []
         for ticker in tickers:
-            task = self._fetch_single_ticker(session, ticker, start_timestamp, end_timestamp)
-            tasks.append(task)
+            try:
+                result = await self._fetch_single_ticker_with_retry(session, ticker, start_timestamp, end_timestamp)
+                results.append(result)
+                # Add delay between requests to avoid rate limiting
+                await asyncio.sleep(random.uniform(0.5, 1.0))
+            except Exception as e:
+                print(f"Error fetching {ticker}: {str(e)}")
+                results.append(e)
         
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Make results compatible with zip
+        results = [(ticker, result) for ticker, result in zip(tickers, results)]
         
         # Process results
         data = {}
-        for ticker, result in zip(tickers, results):
+        for ticker, result in results:
             if isinstance(result, Exception):
                 print(f"Failed to fetch data for {ticker}: {str(result)}")
                 continue
@@ -69,9 +78,54 @@ class DataFetcher:
                 data[ticker] = result
         
         if not data:
-            raise ValueError("Failed to fetch data for any tickers")
+            # If all tickers failed due to rate limiting, use yfinance as fallback
+            print("All tickers failed with rate limiting, attempting yfinance fallback...")
+            try:
+                import yfinance as yf
+                data = await self._fetch_with_yfinance_fallback(tickers, start_date, end_date)
+                if not data:
+                    raise ValueError("Failed to fetch data for any tickers using both Yahoo Finance API and yfinance fallback")
+            except ImportError:
+                raise ValueError("Failed to fetch data for any tickers and yfinance fallback not available")
         
         return data
+    
+    async def _fetch_single_ticker_with_retry(
+        self,
+        session: aiohttp.ClientSession,
+        ticker: str,
+        start_timestamp: int,
+        end_timestamp: int,
+        max_retries: int = 3
+    ) -> Optional[pd.DataFrame]:
+        """Fetch data for a single ticker with retry logic."""
+        for attempt in range(max_retries):
+            try:
+                result = await self._fetch_single_ticker(session, ticker, start_timestamp, end_timestamp)
+                if result is not None:
+                    return result
+                
+                # If no data but no error, wait and retry
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    await asyncio.sleep(wait_time)
+                    
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Too Many Requests" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = (2 ** attempt) * 2 + random.uniform(1, 3)
+                        print(f"Rate limited for {ticker}, retrying in {wait_time:.1f}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"Max retries exceeded for {ticker} due to rate limiting")
+                        return None
+                else:
+                    print(f"Error fetching {ticker}: {error_msg}")
+                    return None
+        
+        return None
     
     async def _fetch_single_ticker(
         self,
@@ -91,17 +145,14 @@ class DataFetcher:
             'events': 'div,splits'
         }
         
-        try:
-            async with session.get(url, params=params) as response:
-                if response.status != 200:
-                    raise Exception(f"HTTP {response.status}: {await response.text()}")
-                
-                data = await response.json()
-                return self._parse_yahoo_response(data, ticker)
-                
-        except Exception as e:
-            print(f"Error fetching {ticker}: {str(e)}")
-            return None
+        async with session.get(url, params=params) as response:
+            if response.status == 429:
+                raise Exception(f"HTTP 429: Too Many Requests")
+            elif response.status != 200:
+                raise Exception(f"HTTP {response.status}: {await response.text()}")
+            
+            data = await response.json()
+            return self._parse_yahoo_response(data, ticker)
     
     def _parse_yahoo_response(self, data: Dict[str, Any], ticker: str) -> Optional[pd.DataFrame]:
         """Parse Yahoo Finance API response."""
@@ -222,6 +273,66 @@ class DataFetcher:
             print(f"Error validating tickers: {str(e)}")
             return {ticker: False for ticker in tickers}
     
+    async def _fetch_with_yfinance_fallback(
+        self,
+        tickers: List[str],
+        start_date: str,
+        end_date: Optional[str] = None
+    ) -> Dict[str, pd.DataFrame]:
+        """Fallback to yfinance when Yahoo Finance API fails."""
+        import yfinance as yf
+        from datetime import datetime
+        
+        if end_date is None:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        
+        data = {}
+        for ticker in tickers:
+            try:
+                # Add small delay to avoid rate limiting
+                await asyncio.sleep(0.2)
+                
+                # Use yfinance synchronously (it's not async)
+                loop = asyncio.get_event_loop()
+                yf_ticker = yf.Ticker(ticker)
+                
+                # Run the synchronous yfinance call in a thread
+                hist_data = await loop.run_in_executor(
+                    None,
+                    lambda: yf_ticker.history(start=start_date, end=end_date)
+                )
+                
+                if not hist_data.empty:
+                    # Convert to our expected format
+                    df = pd.DataFrame()
+                    df['date'] = hist_data.index
+                    df['open'] = hist_data['Open'].values
+                    df['high'] = hist_data['High'].values
+                    df['low'] = hist_data['Low'].values
+                    df['close'] = hist_data['Close'].values
+                    df['adj_close'] = hist_data['Close'].values  # yfinance already provides adjusted close
+                    df['volume'] = hist_data['Volume'].values
+                    
+                    # Drop any rows with NaN values
+                    df = df.dropna()
+                    
+                    df.set_index('date', inplace=True)
+                    df.sort_index(inplace=True)
+                    
+                    if len(df) >= 10:  # Minimum data requirement
+                        data[ticker] = df
+                        print(f"Successfully fetched {ticker} using yfinance fallback")
+                    else:
+                        print(f"Insufficient data for {ticker} from yfinance fallback")
+                else:
+                    print(f"No data returned for {ticker} from yfinance fallback")
+                    
+            except Exception as e:
+                print(f"yfinance fallback failed for {ticker}: {str(e)}")
+                continue
+        
+        return data
+
     async def get_ticker_info(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a ticker."""
         session = await self._get_session()

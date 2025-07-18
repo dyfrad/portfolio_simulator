@@ -27,7 +27,12 @@ class FinancialCalculator:
         Fetch historical adjusted close prices for given tickers.
         Migrated from original fetch_data function.
         """
-        return await self.data_fetcher.fetch_yahoo_finance_data(tickers, start_date, end_date)
+        try:
+            result = await self.data_fetcher.fetch_yahoo_finance_data(tickers, start_date, end_date)
+            return result
+        finally:
+            # Ensure session is closed to prevent warnings
+            await self.data_fetcher.close()
     
     def calculate_returns(self, data: Dict[str, pd.DataFrame], ter: float = 0.0) -> Dict[str, List[float]]:
         """

@@ -9,12 +9,13 @@ import { SimulationConfig, SimulationResults } from '@/lib/types';
 import { formatNumber } from '@/lib/utils';
 
 const simulationSchema = z.object({
-  horizon: z.number().min(1, 'Minimum 1 year').max(50, 'Maximum 50 years'),
-  numSimulations: z.number().min(1000, 'Minimum 1,000 simulations').max(50000, 'Maximum 50,000 simulations'),
+  horizon: z.number().min(1, 'Minimum 1 year').max(10, 'Maximum 10 years'),
+  numSimulations: z.number().min(100, 'Minimum 100 simulations').max(10000, 'Maximum 10,000 simulations'),
   periodicContrib: z.number().min(0, 'Must be non-negative'),
   inflationRate: z.number().min(0, 'Must be non-negative').max(0.5, 'Maximum 50%'),
   stressScenario: z.string(),
   ter: z.number().min(0, 'Must be non-negative').max(0.1, 'Maximum 10%'),
+  contributionFrequency: z.string(),
 });
 
 type SimulationFormData = z.infer<typeof simulationSchema>;
@@ -39,16 +40,18 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<SimulationFormData>({
     resolver: zodResolver(simulationSchema),
     defaultValues: {
-      horizon: 20,
-      numSimulations: 10000,
-      periodicContrib: 1000,
+      horizon: 5,
+      numSimulations: 1000,
+      periodicContrib: 0,
       inflationRate: 0.025,
       stressScenario: 'None',
       ter: 0.002,
+      contributionFrequency: 'monthly',
     },
   });
 
@@ -66,7 +69,8 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
         stressScenario: data.stressScenario,
         ter: data.ter,
         optimizeWeights: false,
-        startDate: '2018-01-01', // Default start date
+        startDate: '2015-01-01', // Default start date
+        contributionFrequency: data.contributionFrequency,
       };
 
       const simulationResults = await runSimulation(config);
@@ -107,7 +111,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Monthly Contribution (€)"
+              label="Periodic Contribution (€)"
               type="number"
               min="0"
               step="100"
@@ -130,6 +134,19 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contribution Frequency
+              </label>
+              <select
+                {...register('contributionFrequency')}
+                className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Stress Scenario
               </label>
               <select
@@ -143,6 +160,9 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
                 <option value="Low_Returns">Low Returns Period</option>
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             <Input
               label="Total Expense Ratio (TER)"
@@ -183,7 +203,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({
               />
             </div>
             <p className="text-sm text-gray-600">
-              Running {formatNumber(10000)} Monte Carlo simulations...
+              Running {formatNumber(watch('numSimulations') || 1000)} Monte Carlo simulations...
             </p>
           </div>
         </div>

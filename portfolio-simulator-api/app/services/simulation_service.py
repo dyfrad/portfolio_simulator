@@ -91,6 +91,10 @@ class SimulationService:
             return response
             
         except Exception as e:
+            print(f"Simulation failed with error: {str(e)}")
+            print(f"Exception type: {type(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Simulation failed: {str(e)}")
     
     async def _run_simulation_engine(

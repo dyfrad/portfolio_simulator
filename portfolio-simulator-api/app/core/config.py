@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     YAHOO_FINANCE_BASE_URL: str = "https://query1.finance.yahoo.com"
     
     # Simulation defaults
-    MAX_SIMULATIONS: int = 50000
-    DEFAULT_SIMULATIONS: int = 10000
+    MAX_SIMULATIONS: int = 10000
+    DEFAULT_SIMULATIONS: int = 1000
     MAX_SIMULATION_TIME_SECONDS: int = 300  # 5 minutes
     
     # Redis for caching

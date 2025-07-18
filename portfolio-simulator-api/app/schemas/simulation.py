@@ -22,8 +22,8 @@ class SimulationRequest(BaseModel):
     portfolio_id: int
     
     # Time parameters
-    horizon_years: float
-    num_simulations: int
+    horizon_years: float = 5.0
+    num_simulations: int = 1000
     
     # Economic parameters
     inflation_rate: float = 0.025
@@ -33,7 +33,7 @@ class SimulationRequest(BaseModel):
     contribution_frequency: str = "monthly"  # monthly, quarterly, annually
     
     # Cost parameters
-    ter: float = 0.001  # Total Expense Ratio
+    ter: float = 0.002  # Total Expense Ratio
     transaction_fee: float = 0.0
     tax_rate: float = 0.0
     
@@ -52,16 +52,16 @@ class SimulationRequest(BaseModel):
     def validate_horizon(cls, v):
         if v <= 0:
             raise ValueError('Horizon must be positive')
-        if v > 50:
-            raise ValueError('Maximum horizon is 50 years')
+        if v > 10:
+            raise ValueError('Maximum horizon is 10 years')
         return v
     
     @validator('num_simulations')
     def validate_num_simulations(cls, v):
         if v < 100:
             raise ValueError('Minimum 100 simulations required')
-        if v > 50000:
-            raise ValueError('Maximum 50,000 simulations allowed')
+        if v > 10000:
+            raise ValueError('Maximum 10,000 simulations allowed')
         return v
     
     @validator('inflation_rate')
@@ -80,7 +80,7 @@ class SimulationRequest(BaseModel):
     
     @validator('contribution_frequency')
     def validate_contribution_frequency(cls, v):
-        allowed = ["monthly", "quarterly", "annually"]
+        allowed = ["monthly", "quarterly"]
         if v not in allowed:
             raise ValueError(f'Contribution frequency must be one of: {allowed}')
         return v
