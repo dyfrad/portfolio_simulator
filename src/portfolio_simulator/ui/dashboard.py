@@ -73,7 +73,7 @@ class PortfolioDashboard:
                 fetch_data, calculate_returns, bootstrap_simulation, 
                 backtest_portfolio, optimize_weights
             )
-            from modules.visualization import (
+            from ..core.visualization import (
                 plot_results, plot_historical_performance,
                 plot_drawdowns, plot_weight_drift
             )
