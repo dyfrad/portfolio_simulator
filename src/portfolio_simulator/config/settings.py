@@ -116,5 +116,35 @@ settings = Settings()
 
 
 def get_settings():
-    """Get the current application settings."""
-    return settings
+    """Get the current application settings as a dictionary."""
+    from .constants import DEFAULT_TICKERS, ISIN_TO_TICKER, DEFAULT_START_DATE
+    
+    # Get environment from env var
+    environment = os.getenv('ENVIRONMENT', 'development')
+    
+    # Load environment-specific config
+    if environment == 'development':
+        from .environments.development import get_config
+        env_config = get_config()
+    elif environment == 'production':
+        from .environments.production import get_config
+        env_config = get_config()
+    elif environment == 'testing':
+        from .environments.testing import get_config
+        env_config = get_config()
+    else:
+        # Default to development
+        from .environments.development import get_config
+        env_config = get_config()
+    
+    # Return combined settings
+    return {
+        'environment': env_config['environment'],
+        'debug': env_config['debug'],
+        'logging_level': env_config['logging_level'],
+        'cache_enabled': env_config['cache_enabled'],
+        'performance_monitoring': env_config['performance_monitoring'],
+        'default_tickers': DEFAULT_TICKERS,
+        'isin_to_ticker': ISIN_TO_TICKER,
+        'default_start_date': DEFAULT_START_DATE,
+    }

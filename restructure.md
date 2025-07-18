@@ -184,6 +184,33 @@ portfolio_simulator/
    - Add `conftest.py` with pytest configuration
    - Create test fixtures and sample data
 
+   **Incremental Implementation Plan:**
+   - Phase 2a: Create basic test structure
+     1. Create `tests/` directory with proper subdirectories (unit/, integration/, fixtures/)
+     2. Add `tests/__init__.py` and `tests/conftest.py` with basic pytest configuration
+     3. Create `tests/fixtures/__init__.py` and `tests/fixtures/sample_data.py` for test data
+     4. Result: Basic test framework structure is in place
+   
+   - Phase 2b: Set up pytest configuration and dependencies
+     1. Add pytest and testing dependencies to `pyproject.toml` dev dependencies
+     2. Configure pytest settings in `pyproject.toml` or `pytest.ini`
+     3. Add test markers for different test types (unit, integration, slow)
+     4. Result: Pytest is properly configured and ready for use
+   
+   - Phase 2c: Create test fixtures and sample data
+     1. Create sample portfolio data in `tests/fixtures/sample_data.py`
+     2. Create mock market data for testing financial calculations
+     3. Add fixtures for different simulation scenarios
+     4. Create helper functions for test data generation
+     5. Result: Comprehensive test data available for all test scenarios
+   
+   - Phase 2d: Set up test utilities and helpers
+     1. Create `tests/utils.py` with common test utilities
+     2. Add assertion helpers for financial calculations
+     3. Create mock objects for external dependencies (Yahoo Finance)
+     4. Add test decorators for parametrized tests
+     5. Result: Test utilities support efficient test development
+
 2. **Write unit tests**
    - Test each module in `core/`
    - Test configuration management
