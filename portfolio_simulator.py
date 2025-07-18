@@ -20,34 +20,14 @@ from modules.data_operations import (
     ISIN_TO_TICKER,
     DEFAULT_START_DATE
 )
+from modules.financial_calculations import (
+    portfolio_stats,
+    optimize_weights
+)
 
 
 
 
-def portfolio_stats(weights, returns, cash_ticker=DEFAULT_TICKERS[3]):
-    """
-    Calculate historical portfolio statistics, including Sortino and max drawdown.
-    """
-    port_returns = np.dot(returns, weights)
-    mean_return = np.mean(port_returns)
-    annual_return = mean_return * 252
-    annual_vol = np.std(port_returns) * np.sqrt(252)
-    rf_rate = returns[cash_ticker].mean() * 252 if cash_ticker in returns.columns else 0
-    sharpe = (annual_return - rf_rate) / annual_vol if annual_vol != 0 else 0
-    
-    # Sortino Ratio
-    downside_returns = port_returns.copy()
-    downside_returns[port_returns > 0] = 0
-    downside_std = np.std(downside_returns) * np.sqrt(252)
-    sortino = (annual_return - rf_rate) / downside_std if downside_std > 0 else 0
-    
-    # Max Drawdown
-    cum_returns = np.cumprod(1 + port_returns)
-    peaks = np.maximum.accumulate(cum_returns)
-    drawdowns = (cum_returns / peaks) - 1
-    max_dd = drawdowns.min()
-    
-    return annual_return, annual_vol, sharpe, sortino, max_dd
 
 def bootstrap_simulation(returns, weights, num_simulations, time_horizon_years, initial_investment, inflation_rate=0.0, periodic_contrib=0.0, contrib_frequency='monthly', transaction_fee=0.0, tax_rate=0.0, rebalance=False, rebalance_frequency='annual', rebalance_threshold=0.05, shock_factors=None, base_invested=None, progress_callback=None):
     """
@@ -280,14 +260,4 @@ def backtest_portfolio(data, weights, initial_investment, periodic_contrib=0.0, 
         'Max Drawdown': max_dd
     }
 
-def optimize_weights(returns, cash_ticker=DEFAULT_TICKERS[3]):
-    def objective(weights):
-        ann_ret, ann_vol, sharpe, _, _ = portfolio_stats(weights, returns, cash_ticker)
-        return -sharpe  # Minimize negative Sharpe
-    
-    constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
-    bounds = [(0, 1) for _ in range(len(returns.columns))]
-    initial_guess = np.array([1/len(returns.columns)] * len(returns.columns))
-    result = minimize(objective, initial_guess, bounds=bounds, constraints=constraints)
-    return result.x if result.success else None
 
