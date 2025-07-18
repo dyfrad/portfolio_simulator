@@ -8,7 +8,7 @@ import yfinance as yf
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import numpy as np
-from ...config.settings import get_settings
+from ...config.settings import settings
 
 
 @dataclass
@@ -133,7 +133,6 @@ class SidebarInputs:
     def _render_weight_inputs(self, all_tickers: List[str]) -> np.ndarray:
         """Render weight input controls for tickers."""
         st.sidebar.subheader('Portfolio Weights')
-        settings = get_settings()
         
         weights = []
         cols = st.sidebar.columns(2)
@@ -159,7 +158,6 @@ class SidebarInputs:
     
     def _render_simulation_parameters(self, calculated_initial_investment: float = 100000.0, has_uploaded_file: bool = False) -> dict:
         """Render simulation parameter inputs."""
-        settings = get_settings()
         
         horizon = st.sidebar.number_input(
             f'Time Horizon ({settings.time_horizon_min} - {settings.time_horizon_max} Years, in steps of {settings.time_horizon_step} year):', 
@@ -205,7 +203,6 @@ class SidebarInputs:
     
     def _render_cost_parameters(self) -> dict:
         """Render cost and fee parameter inputs."""
-        settings = get_settings()
         
         ter = st.sidebar.number_input(
             f'Annual TER ({settings.ter_min} - {settings.ter_max} %, in steps of {settings.ter_step}%)', 
@@ -230,7 +227,6 @@ class SidebarInputs:
     
     def _render_rebalancing_parameters(self) -> dict:
         """Render rebalancing parameter inputs."""
-        settings = get_settings()
         
         rebalance = st.sidebar.checkbox('Enable Rebalancing', value=settings.default_rebalance)
         
