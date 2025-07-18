@@ -2,7 +2,8 @@
 Configuration settings for the Portfolio Simulator API.
 """
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import List, Optional
 import os
 
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost/portfolio_db"
+    DATABASE_URL: str = "sqlite:///./portfolio.db"
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-this-in-production"

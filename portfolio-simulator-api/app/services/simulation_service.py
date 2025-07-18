@@ -5,6 +5,8 @@ Portfolio simulation service for Monte Carlo analysis.
 import uuid
 import time
 import asyncio
+import numpy as np
+from datetime import datetime
 from typing import List, Optional, Dict, Any, Callable
 from sqlalchemy.orm import Session
 from app.models.portfolio import Portfolio
@@ -34,7 +36,7 @@ class SimulationService:
         
         try:
             # Fetch historical data
-            from datetime import datetime, timedelta
+            from datetime import timedelta
             
             if config.start_date:
                 start_date = config.start_date
@@ -100,7 +102,6 @@ class SimulationService:
         progress_callback: Optional[Callable[[float], None]] = None
     ) -> Dict[str, Any]:
         """Core simulation engine."""
-        import numpy as np
         
         tickers = list(returns.keys())
         num_simulations = config.num_simulations
@@ -301,4 +302,30 @@ class SimulationService:
             'config': result.config,
             'results': result.results,
             'created_at': result.created_at
-        } 
+        }
+    
+    def get_simulation_progress(self, simulation_id: str, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get simulation progress."""
+        # For now, return completed status since we don't have async progress tracking
+        result = self.db.query(SimulationResult).filter(
+            SimulationResult.simulation_id == simulation_id,
+            SimulationResult.user_id == user_id
+        ).first()
+        
+        if not result:
+            return None
+        
+        return {
+            'progress': 100.0,
+            'status': 'completed'
+        }
+    
+    async def run_stress_test_simulation(
+        self,
+        portfolio: Portfolio,
+        config: SimulationRequest,
+        user_id: int
+    ) -> SimulationResponse:
+        """Run stress test simulation (premium feature)."""
+        # For now, this is the same as regular simulation with stress scenario
+        return await self.run_monte_carlo_simulation(portfolio, config, user_id) 

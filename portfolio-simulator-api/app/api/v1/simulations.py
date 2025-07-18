@@ -78,6 +78,15 @@ async def run_simulation(
             detail=f"Simulation failed: {str(e)}"
         )
 
+@router.get("/")
+def get_user_simulations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Get user's simulation history."""
+    service = SimulationService(db)
+    return service.get_user_simulation_history(current_user.id)
+
 @router.get("/history")
 def get_simulation_history(
     current_user: User = Depends(get_current_user),
@@ -104,6 +113,24 @@ def get_simulation_result(
         )
     
     return result
+
+@router.get("/progress/{simulation_id}")
+def get_simulation_progress(
+    simulation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Get simulation progress."""
+    service = SimulationService(db)
+    progress = service.get_simulation_progress(simulation_id, current_user.id)
+    
+    if progress is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Simulation not found"
+        )
+    
+    return progress
 
 @router.post("/stress-test")
 async def run_stress_test(
