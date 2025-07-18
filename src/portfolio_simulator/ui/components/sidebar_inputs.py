@@ -8,6 +8,7 @@ import yfinance as yf
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import numpy as np
+from ...config.settings import get_settings
 
 
 @dataclass
@@ -132,6 +133,8 @@ class SidebarInputs:
     def _render_weight_inputs(self, all_tickers: List[str]) -> np.ndarray:
         """Render weight input controls for tickers."""
         st.sidebar.subheader('Portfolio Weights')
+        settings = get_settings()
+        
         weights = []
         cols = st.sidebar.columns(2)
         
@@ -139,10 +142,10 @@ class SidebarInputs:
             col = cols[i % 2]
             weight = col.number_input(
                 ticker, 
-                min_value=0.0, 
-                max_value=1.0, 
+                min_value=settings.portfolio_weight_min, 
+                max_value=settings.portfolio_weight_max, 
                 value=1.0/len(all_tickers), 
-                step=0.05
+                step=settings.portfolio_weight_step
             )
             weights.append(weight)
         
@@ -156,37 +159,40 @@ class SidebarInputs:
     
     def _render_simulation_parameters(self, calculated_initial_investment: float = 100000.0, has_uploaded_file: bool = False) -> dict:
         """Render simulation parameter inputs."""
+        settings = get_settings()
+        
         horizon = st.sidebar.number_input(
-            'Time Horizon (1 - 10 Years, in steps of 0.25 year):', 
-            min_value=1.0, max_value=10.0, value=5.0, step=0.25
+            f'Time Horizon ({settings.time_horizon_min} - {settings.time_horizon_max} Years, in steps of {settings.time_horizon_step} year):', 
+            min_value=settings.time_horizon_min, max_value=settings.time_horizon_max, value=settings.default_time_horizon_years, step=settings.time_horizon_step
         )
         
         simulations = st.sidebar.number_input(
-            'Number of Simulations (100 - 10000, in steps of 100)', 
-            min_value=100, max_value=10000, value=1000, step=100
+            f'Number of Simulations ({settings.num_simulations_min} - {settings.num_simulations_max}, in steps of {settings.num_simulations_step})', 
+            min_value=settings.num_simulations_min, max_value=settings.num_simulations_max, value=settings.default_num_simulations, step=settings.num_simulations_step
         )
         
         initial_investment = st.sidebar.number_input(
             'Initial Investment (€)', 
-            min_value=0.0, 
+            min_value=settings.initial_investment_min, 
             value=calculated_initial_investment, 
-            step=1000.0,
+            step=settings.initial_investment_step,
             disabled=has_uploaded_file
         )
         
         periodic_contrib = st.sidebar.number_input(
             'Periodic Contribution (€)', 
-            min_value=0.0, value=0.0, step=100.0
+            min_value=settings.periodic_contrib_min, value=settings.default_periodic_contrib, step=settings.periodic_contrib_step
         )
         
         contrib_frequency = st.sidebar.selectbox(
             'Contribution Frequency', 
-            ['monthly', 'quarterly']
+            ['monthly', 'quarterly'],
+            index=0 if settings.default_contrib_frequency == 'monthly' else 1
         )
         
         inflation_rate = st.sidebar.number_input(
-            'Expected Annual Inflation Rate (0 - 20 %, in steps of 0.1%)', 
-            min_value=0.0, max_value=20.0, value=2.0, step=0.1
+            f'Expected Annual Inflation Rate ({settings.inflation_rate_min} - {settings.inflation_rate_max} %, in steps of {settings.inflation_rate_step}%)', 
+            min_value=settings.inflation_rate_min, max_value=settings.inflation_rate_max, value=settings.default_inflation_rate, step=settings.inflation_rate_step
         ) / 100
         
         return {
@@ -199,19 +205,21 @@ class SidebarInputs:
     
     def _render_cost_parameters(self) -> dict:
         """Render cost and fee parameter inputs."""
+        settings = get_settings()
+        
         ter = st.sidebar.number_input(
-            'Annual TER (0 - 2 %, in steps of 0.01%)', 
-            min_value=0.0, max_value=2.0, value=0.2, step=0.01
+            f'Annual TER ({settings.ter_min} - {settings.ter_max} %, in steps of {settings.ter_step}%)', 
+            min_value=settings.ter_min, max_value=settings.ter_max, value=settings.default_transaction_fee, step=settings.ter_step
         )
         
         transaction_fee = st.sidebar.number_input(
             'Transaction Fee per Buy (€)', 
-            min_value=0.0, value=5.0, step=1.0
+            min_value=settings.transaction_fee_min, value=settings.default_transaction_fee_fixed, step=settings.transaction_fee_step
         )
         
         tax_rate = st.sidebar.number_input(
-            'Capital Gains Tax Rate (0 - 50 %, in steps of 0.1%)', 
-            min_value=0.0, max_value=50.0, value=25.0, step=0.1
+            f'Capital Gains Tax Rate ({settings.tax_rate_min} - {settings.tax_rate_max} %, in steps of {settings.tax_rate_step}%)', 
+            min_value=settings.tax_rate_min, max_value=settings.tax_rate_max, value=settings.default_tax_rate, step=settings.tax_rate_step
         ) / 100
         
         return {
@@ -222,16 +230,19 @@ class SidebarInputs:
     
     def _render_rebalancing_parameters(self) -> dict:
         """Render rebalancing parameter inputs."""
-        rebalance = st.sidebar.checkbox('Enable Rebalancing')
+        settings = get_settings()
+        
+        rebalance = st.sidebar.checkbox('Enable Rebalancing', value=settings.default_rebalance)
         
         rebalance_frequency = st.sidebar.selectbox(
             'Rebalancing Frequency', 
-            ['quarterly', 'annual']
+            ['quarterly', 'annual'],
+            index=0 if settings.default_rebalance_frequency == 'quarterly' else 1
         )
         
         rebalance_threshold = st.sidebar.number_input(
-            'Rebalancing Threshold (0 - 20 %, in steps of 0.5%)', 
-            min_value=0.0, max_value=20.0, value=5.0, step=0.5
+            f'Rebalancing Threshold ({settings.rebalance_threshold_min} - {settings.rebalance_threshold_max} %, in steps of {settings.rebalance_threshold_step}%)', 
+            min_value=settings.rebalance_threshold_min, max_value=settings.rebalance_threshold_max, value=settings.default_rebalance_threshold * 100, step=settings.rebalance_threshold_step
         ) / 100
         
         return {

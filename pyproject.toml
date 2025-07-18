@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio-simulator"
+version = "0.1.0"
+description = "A personal, locally-run Streamlit-based web dashboard for simulating and analyzing investment portfolios"
+readme = "README.md"
+authors = [
+    {name = "Mohit Saharan", email = "mohit@msaharan.com"}
+]
+license = {text = "Private"}
+keywords = ["portfolio", "simulation", "finance", "monte-carlo", "streamlit"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "streamlit",
+    "yfinance",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "plotly",
+    "reportlab",
+    "kaleido",
+]
+
+[project.urls]
+Homepage = "https://github.com/msaharan/portfolio_simulator"
+Repository = "https://github.com/msaharan/portfolio_simulator"
+Documentation = "https://github.com/msaharan/portfolio_simulator/blob/main/README.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=2.20.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.0.0",
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+]
+
+[project.scripts]
+portfolio-simulator = "scripts.run_simulator:main"
+portfolio-ui = "scripts.run_ui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["portfolio_simulator*"]
+
+[tool.setuptools.package-dir]
+"" = "src"

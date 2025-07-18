@@ -5,7 +5,7 @@ Author: Mohit Saharan
 Email: mohit@msaharan.com
 """
 
-from ui import PortfolioDashboard
+from src.portfolio_simulator.ui import PortfolioDashboard
 
 # Configuration constants from original file
 DEFAULT_TICKERS = ['IWDA.AS', 'QDV5.DE', 'PPFB.DE', 'XEON.DE']

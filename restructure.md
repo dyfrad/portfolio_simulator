@@ -141,10 +141,42 @@ portfolio_simulator/
    - Create settings management in `src/portfolio_simulator/config/settings.py`
    - Add environment-specific configurations
 
+   **Incremental Implementation Plan:**
+   - Phase 2a: Complete configuration extraction
+     1. Create `src/portfolio_simulator/config/settings.py` for dynamic settings
+     2. Create environment-specific config files
+     3. Update modules to use centralized configuration
+     4. Result: All configuration is centralized and manageable
+   
+   - Phase 2b: Add environment support
+     1. Create `src/portfolio_simulator/config/environments/` directory
+     2. Add development.py, production.py, testing.py configs
+     3. Add environment detection and loading logic
+     4. Result: App supports multiple environments seamlessly
+
 3. **Create modern packaging**
    - Replace `requirements.txt` with `pyproject.toml`
    - Add project metadata and build configuration
    - Define development dependencies
+
+   **Incremental Implementation Plan:**
+   - Phase 3a: Create pyproject.toml alongside requirements.txt
+     1. Create `pyproject.toml` with existing dependencies from `requirements.txt`
+     2. Add project metadata (name, version, description, etc.)
+     3. Define build system configuration
+     4. Result: Modern packaging config exists alongside old one
+   
+   - Phase 3b: Add development and optional dependencies
+     1. Add development dependencies section (testing, linting, etc.)
+     2. Add optional dependencies for different features
+     3. Define console scripts for entry points
+     4. Result: Complete packaging configuration ready for use
+   
+   - Phase 3c: Test and validate packaging
+     1. Test package installation in clean environment
+     2. Verify all dependencies are correctly specified
+     3. Test console scripts work properly
+     4. Result: Packaging system is production-ready
 
 ### Phase 2: Testing Infrastructure (High Priority)
 1. **Set up testing framework**
