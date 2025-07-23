@@ -67,9 +67,9 @@ portfolio_simulator/
 └── README.md                       # This file
 ```
 
-## Features
+## Features and Usage
 
-- **Portfolio Allocation**: Adjust weights for default UCITS-compliant ETFs (e.g., IWDA.AS for MSCI World, QDV5.DE for MSCI India, PPFB.DE for Gold, XEON.DE for Cash) or add custom tickers.
+- **Portfolio Allocation**: Adjust weights for default UCITS-compliant ETFs or add custom tickers.
 - **Inflation Adjustment**: Input expected annual inflation rate to adjust final values.
 - **Custom Assets**: Add custom tickers via text input.
 - **Visualizations**: Line charts for historical cumulative returns, drawdown curves, weight drift, and simulation outcome distributions.
@@ -82,9 +82,14 @@ portfolio_simulator/
 - **Portfolio Upload**: Upload CSV for holdings (Ticker, Shares, Cost Basis) or transaction history (tuned for Degiro transactions) to compute current value and weights.
 - **Educational Tooltips**: Help explanations for metrics.
 
-## Installation
+**How to Use:**
+- Adjust sidebar inputs (weights, horizon, contributions, etc.)
+- Upload CSV for portfolio holdings or transactions (Degiro format supported)
+- Click "Run Simulation" to generate results, metrics, and charts
+- View historical performance, drawdowns, weight drift, and outcome distributions
+- Add custom tickers or optimize weights for maximum Sharpe ratio
 
-Since this is a cloned repository for personal use:
+## Installation
 
 1. Ensure you have Python 3.8+ installed (recommended: 3.12 for better performance and security).
 2. Clone the repository (already done):
@@ -101,221 +106,85 @@ Since this is a cloned repository for personal use:
    ```bash
    pip install -e .
    ```
-   
-   **Alternative**: Install from requirements.txt for legacy compatibility:
+   Or, for legacy compatibility:
    ```bash
    pip install -r requirements.txt
    ```
-
-### Modern Package Installation
-
-The project now uses modern Python packaging with `pyproject.toml`. This provides:
-- **Proper dependency management** with optional dependencies for development and testing
-- **Entry point scripts** accessible from anywhere after installation
-- **Editable installs** for development with `pip install -e .`
-
-### Development Dependencies
-
-For development and testing, install with development dependencies:
-```bash
-pip install -e ".[dev,test]"
-```
-
-This includes tools for:
-- **Testing**: pytest, pytest-cov, pytest-mock
-- **Code Quality**: black, flake8, mypy, pre-commit
-- **Documentation**: sphinx, sphinx-rtd-theme
+5. For development and testing dependencies:
+   ```bash
+   pip install -e ".[dev,test]"
+   ```
 
 ## Running the Application
 
-### Method 1: Using Entry Point Scripts (Recommended)
-After installing the package, you can run the application from anywhere:
-```bash
-# Run the Streamlit UI
-portfolio-ui
+- **Entry Point Scripts (Recommended):**
+  ```bash
+  portfolio-ui
+  portfolio-simulator
+  ```
+- **Legacy Entry Point:**
+  ```bash
+  streamlit run portfolio_simulator_ui.py
+  ```
+- **Script Files:**
+  ```bash
+  python scripts/run_ui.py
+  ```
 
-# Or run the simulation engine directly
-portfolio-simulator
-```
-
-### Method 2: Using Legacy Entry Point
-For backward compatibility, you can still use the legacy entry point:
-```bash
-streamlit run portfolio_simulator_ui.py
-```
-
-### Method 3: Using Script Files
-Navigate to the scripts directory and run:
-```bash
-python scripts/run_ui.py
-```
-
-### Application Access
 The application will launch in your default web browser (typically at `http://localhost:8501`).
 
-### Development Guidelines
-- **Core Logic**: Located in `src/portfolio_simulator/core/` modules
-- **UI Components**: Organized in `src/portfolio_simulator/ui/` 
-- **Configuration**: Managed through `src/portfolio_simulator/config/`
-- **Testing**: Comprehensive test suite in `tests/` directory
+**Note:** Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
 
-**Note**: Data is fetched from Yahoo Finance, so an internet connection is required for simulations.
+## Docker
 
-## Running with Docker
-
-For a containerized environment (useful for isolation or deployment):
-
-1. Ensure Docker is installed on your system.
+1. Ensure Docker is installed.
 2. Build the Docker image:
-   ```
+   ```bash
    docker build -t portfolio-simulator .
    ```
 3. Run the container:
-   ```
+   ```bash
    docker run -p 8501:8501 portfolio-simulator
    ```
-4. Access the app in your browser at `http://localhost:8501`.
-
-This setup ensures all dependencies are contained and the app runs consistently across environments.
-
-## Usage
-
-1. **Sidebar Inputs**:
-   - Adjust weights, time horizon, simulations, initial investment, contributions, inflation, fees/taxes, rebalancing, and stress scenarios.
-   - Upload a CSV for portfolio holdings or transactions (tuned for Degiro transactions) to auto-populate weights and values.
-   - Optional: Optimize weights for maximum Sharpe ratio.
-
-2. **Run Simulation**:
-   - Click "Run Simulation" to generate results, metrics, and charts.
-   - View historical performance, drawdowns, weight drift, and outcome distributions.
-
-3. **Backtesting**:
-   - Automatically runs with simulation; shows historical returns, volatility, etc.
-
-4. **Customization**:
-   - Add custom tickers in the sidebar (comma-separated).
-   - Modify default tickers or ISIN mappings in the code if needed.
-   - Extend features by editing functions (e.g., add new stress scenarios).
+4. Access the app at `http://localhost:8501`.
 
 ## Configuration
 
-The application uses a sophisticated configuration management system:
-
-### Configuration Structure
-- **Constants**: Default tickers and mappings in `src/portfolio_simulator/config/constants.py`
-- **Settings**: Application settings in `src/portfolio_simulator/config/settings.py`
-- **Environments**: Environment-specific configurations in `src/portfolio_simulator/config/environments/`
-
-### Key Configuration Options
-- **Default Start Date**: '2015-01-01' (configurable)
-- **ISIN to Ticker Mapping**: Extensible mapping in `constants.py`
-- **Environment Settings**: Separate configs for development, production, and testing
-- **Cache**: Uses Streamlit's `@st.cache_data` for performance optimization
-- **Session State**: Intelligent state management to avoid re-computation
-
-### Environment Variables
-Set environment-specific behavior using:
-```bash
-export ENVIRONMENT=development  # or production, testing
-export DEBUG=true              # Enable debug mode
-```
+- **Constants:** Default tickers and mappings in `src/portfolio_simulator/config/constants.py`
+- **Settings:** Application settings in `src/portfolio_simulator/config/settings.py`
+- **Environments:** Environment-specific configurations in `src/portfolio_simulator/config/environments/`
+- **Key Options:** Default start date, ISIN to ticker mapping, environment settings, cache, session state
+- **Environment Variables:**
+  ```bash
+  export ENVIRONMENT=development  # or production, testing
+  export DEBUG=true              # Enable debug mode
+  ```
 
 ## Development
 
-The codebase follows modern Python packaging standards and clean architecture principles:
+- **Architecture:** Modular, separation of concerns, testable code, environment-specific config
+- **Where to Add Code:**
+  - Core logic: `src/portfolio_simulator/core/`
+  - UI: `src/portfolio_simulator/ui/components/`
+  - Config: `src/portfolio_simulator/config/`
+  - Tests: `tests/unit/`, `tests/integration/`
+- **Code Quality Tools:** black, flake8, mypy, pre-commit (install with dev dependencies)
 
-### Architecture Overview
-- **Separation of Concerns**: Business logic separated from UI and configuration
-- **Modular Design**: Each module has a single responsibility
-- **Testable Code**: Comprehensive test coverage with unit and integration tests
-- **Configuration Management**: Environment-specific settings and constants
+## Testing
 
-### Development Workflow
-1. **Core Financial Logic**: Implement in `src/portfolio_simulator/core/`
-2. **UI Components**: Create reusable components in `src/portfolio_simulator/ui/components/`
-3. **Configuration**: Add settings to appropriate config modules
-4. **Testing**: Write tests in `tests/unit/` and `tests/integration/`
-
-### Testing
-Run the comprehensive test suite:
+Run the comprehensive test suite from the project root:
 ```bash
-# Run all tests
 pytest
-
-# Run with coverage
-pytest --cov=src/portfolio_simulator
-
-# Run specific test types
-pytest tests/unit/          # Unit tests only
-pytest tests/integration/   # Integration tests only
 ```
-
-### Code Quality
-The project includes tools for maintaining code quality:
-```bash
-# Format code
-black src/ tests/
-
-# Lint code
-flake8 src/ tests/
-
-# Type checking
-mypy src/
-```
-
-## Testing Infrastructure
-
-The project includes a comprehensive testing framework with 135+ tests achieving 44% code coverage:
-
-### Test Structure
-```
-tests/
-├── conftest.py                 # Pytest configuration and shared fixtures
-├── fixtures/                   # Test data and mock objects
-│   └── sample_data.py         # Sample portfolio and market data
-├── unit/                      # Unit tests (104 tests)
-│   ├── test_data_operations.py       # Data fetching and processing tests
-│   ├── test_financial_calculations.py # Portfolio statistics and optimization tests  
-│   ├── test_simulation_engine.py     # Monte Carlo simulation tests
-│   ├── test_backtesting.py          # Historical backtesting tests
-│   ├── test_visualization.py        # Chart generation tests
-│   └── test_config.py              # Configuration management tests
-├── integration/               # Integration tests (10 tests)
-│   └── test_portfolio_simulator.py  # End-to-end workflow tests
-└── utils.py                   # Test utilities and assertion helpers
-```
-
-### Test Categories
-
-- **Unit Tests**: Test individual functions and methods in isolation
-- **Integration Tests**: Test complete workflows from data fetch to visualization
-- **Mock Objects**: Comprehensive mocking of external dependencies (Yahoo Finance, etc.)
-- **Parametrized Tests**: Multiple test scenarios with different inputs
-- **Financial Assertions**: Specialized assertions for validating financial calculations
-
-### Test Execution
-
-```bash
-# Run all tests
-pytest
-
-# Run with verbose output
-pytest -v
-
-# Run specific test categories
-pytest tests/unit/                    # Unit tests only
-pytest tests/integration/             # Integration tests only
-pytest -m "not slow"                  # Skip slow tests
-
-# Run with coverage reporting
-pytest --cov=src/portfolio_simulator --cov-report=html
-```
-
-### Test Coverage
-Current test coverage focuses on core financial functionality:
-- **Core Modules**: 98-100% coverage for financial calculations, simulation, and backtesting
-- **Configuration**: 100% coverage for settings and environment management  
-- **Overall**: 44% total coverage with comprehensive testing of critical financial logic
+- For coverage:
+  ```bash
+  pytest --cov=src/portfolio_simulator
+  ```
+- For specific test types:
+  ```bash
+  pytest tests/unit/          # Unit tests only
+  pytest tests/integration/   # Integration tests only
+  ```
 
 ## Troubleshooting
 
