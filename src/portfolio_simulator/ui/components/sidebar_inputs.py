@@ -104,7 +104,7 @@ class SidebarInputs:
             all_tickers.extend([t.strip() for t in custom_tickers.split(',')])
         
         uploaded_file = st.sidebar.file_uploader(
-            "Upload Portfolio CSV (Ticker, Shares, Cost Basis) or Transactions CSV", 
+            "Upload Portfolio CSV (Ticker, Shares, Cost Basis) or Degiro Transactions CSV", 
             type="csv"
         )
         
