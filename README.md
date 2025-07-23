@@ -372,3 +372,7 @@ If you want to deploy to Streamlit Community Cloud for easier access (e.g., on m
 5. Note: Free for personal apps, but keep it private.
 
 For questions or issues, refer to the code comments or Streamlit documentation.
+
+## License
+
+This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See the [LICENSE](LICENSE) file for details.
